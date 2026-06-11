@@ -1,0 +1,110 @@
+workflows:
+
+  vocal-assistant-android:
+    name: Vocal Assistant - APK Android
+    max_build_duration: 60  # minutes
+
+    environment:
+      flutter: stable         # Dernière version stable Flutter
+      java: 17                # Java 17 requis pour Android moderne
+      android_signing:
+        - vocal_assistant_key # Clé de signature (debug si absent)
+
+    triggering:
+      events:
+        - push                # Build automatique à chaque push GitHub
+      branch_patterns:
+        - pattern: main
+          include: true
+
+    scripts:
+
+      # ── Étape 1 : Vérifier l'environnement ──────────────────
+      - name: Vérification Flutter
+        script: |
+          flutter --version
+          flutter doctor -v
+
+      # ── Étape 2 : Créer les dossiers assets ─────────────────
+      - name: Créer dossiers assets
+        script: |
+          mkdir -p assets/models
+          mkdir -p assets/animations
+          mkdir -p assets/fonts
+          echo "✅ Dossiers assets créés"
+
+      # ── Étape 3 : Télécharger modèles Vosk offline ──────────
+      # Modèle Français (45 MB) + Anglais (40 MB)
+      - name: Télécharger modèles Vosk FR + EN
+        script: |
+          echo "📥 Téléchargement modèle Français..."
+          wget -q https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip \
+               -O /tmp/vosk-fr.zip
+          unzip -q /tmp/vosk-fr.zip -d assets/models/
+          rm /tmp/vosk-fr.zip
+          echo "✅ Modèle FR installé"
+
+          echo "📥 Téléchargement modèle Anglais..."
+          wget -q https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip \
+               -O /tmp/vosk-en.zip
+          unzip -q /tmp/vosk-en.zip -d assets/models/
+          rm /tmp/vosk-en.zip
+          echo "✅ Modèle EN installé"
+
+          echo "📂 Contenu assets/models:"
+          ls -lh assets/models/
+
+      # ── Étape 4 : Installer les dépendances Flutter ─────────
+      - name: Flutter pub get
+        script: |
+          flutter pub get
+          echo "✅ Dépendances installées"
+
+      # ── Étape 5 : Générer les fichiers Drift SQL ─────────────
+      # ⚠️ ERRORS_LOG [E012]: Obligatoire après chaque modif de table
+      - name: Générer fichiers Drift (build_runner)
+        script: |
+          flutter pub run build_runner build --delete-conflicting-outputs
+          echo "✅ Fichiers .g.dart générés"
+
+      # ── Étape 6 : Analyser le code ───────────────────────────
+      - name: Analyse du code
+        script: |
+          flutter analyze --no-fatal-infos || true
+          echo "✅ Analyse terminée"
+
+      # ── Étape 7 : Compiler l'APK ─────────────────────────────
+      - name: Build APK Debug (pour tester)
+        script: |
+          flutter build apk \
+            --debug \
+            --target-platform android-arm64 \
+            --dart-define=FLUTTER_BUILD_MODE=debug
+          echo "✅ APK Debug compilé"
+
+      # ── Étape 8 : Compiler l'APK Release (final) ─────────────
+      - name: Build APK Release
+        script: |
+          flutter build apk \
+            --release \
+            --target-platform android-arm64 \
+            --obfuscate \
+            --split-debug-info=build/debug-info
+          echo "✅ APK Release compilé"
+
+    # ── Fichiers à récupérer après le build ───────────────────
+    artifacts:
+      - build/app/outputs/flutter-apk/app-debug.apk
+      - build/app/outputs/flutter-apk/app-release.apk
+      - build/app/outputs/flutter-apk/*.apk
+      - build/debug-info/         # Infos debug pour analyser les crashs
+      - flutter_drive.log
+
+    # ── Notification par email quand c'est prêt ───────────────
+    publishing:
+      email:
+        recipients:
+          - ton-email@exemple.com   # ← Remplace par ton email
+        notify:
+          success: true
+          failure: true

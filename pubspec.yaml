@@ -1,0 +1,91 @@
+name: vocal_assistant
+description: Assistant vocal Android offline - Appels, SMS, WhatsApp, Réveil, Voiture
+version: 2.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ── Reconnaissance vocale OFFLINE ──────────────────────────
+  vosk_flutter: ^0.2.0
+
+  # ── Synthèse vocale OFFLINE ────────────────────────────────
+  flutter_tts: ^3.8.5
+
+  # ── Téléphone & Appels ─────────────────────────────────────
+  flutter_phone_state: ^1.0.4
+  url_launcher: ^6.2.5          # Lancer un appel via tel:
+
+  # ── Répertoire / Contacts ──────────────────────────────────
+  flutter_contacts: ^1.1.9+1
+
+  # ── Permissions ────────────────────────────────────────────
+  permission_handler: ^11.3.1
+
+  # ── Base de données SQL OFFLINE ────────────────────────────
+  drift: ^2.18.0
+  sqlite3_flutter_libs: ^0.5.24
+  path_provider: ^2.1.3
+  path: ^1.9.0
+
+  # ── Gestion d'état ─────────────────────────────────────────
+  flutter_bloc: ^8.1.5
+  equatable: ^2.0.5
+
+  # ── Injection de dépendances ───────────────────────────────
+  get_it: ^7.7.0
+
+  # ── SMS ────────────────────────────────────────────────────
+  telephony: ^0.2.0             # Envoyer et lire les SMS
+  flutter_sms: ^2.3.2           # Envoi SMS alternatif
+
+  # ── WhatsApp ───────────────────────────────────────────────
+  url_launcher: ^6.2.5          # Ouvrir WhatsApp via URL
+
+  # ── Réveil / Minuterie ─────────────────────────────────────
+  flutter_local_notifications: ^17.2.2  # Notifications locales
+  android_alarm_manager_plus: ^3.0.4    # Réveil natif Android
+  timezone: ^0.9.4                      # Gestion fuseaux horaires
+
+  # ── Hotword / Écoute permanente ────────────────────────────
+  # Utilise Vosk (déjà installé) — aucune clé, aucun compte ✅
+
+  # ── Service arrière-plan ───────────────────────────────────
+  flutter_foreground_task: ^8.8.0  # Service écoute permanent
+  connectivity_plus: ^6.0.3        # Détection réseau
+
+  # ── Mode voiture ───────────────────────────────────────────
+  wakelock_plus: ^1.2.8         # Garder écran allumé
+  screen_brightness: ^1.0.1     # Luminosité auto
+
+  # ── UI ─────────────────────────────────────────────────────
+  google_fonts: ^6.2.1
+  animations: ^2.0.11
+  flutter_animate: ^4.5.0
+  lottie: ^3.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  drift_dev: ^2.18.0
+  build_runner: ^2.4.11
+  mockito: ^5.4.4
+  bloc_test: ^9.1.7
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/models/
+    - assets/animations/
+    - assets/sounds/
+  fonts:
+    - family: SpaceGrotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Regular.ttf
+        - asset: assets/fonts/SpaceGrotesk-Bold.ttf
+          weight: 700
