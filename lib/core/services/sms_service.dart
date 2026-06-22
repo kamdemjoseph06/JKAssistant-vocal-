@@ -1,10 +1,8 @@
 import 'package:flutter/foundation.dart';
-import 'package:telephony/telephony.dart';
+import 'package:flutter_sms/flutter_sms.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class SmsService {
-  final Telephony _telephony = Telephony.instance;
-
   /// Envoyer un SMS par voix
   /// Commande : "Envoie un message à Jean je suis en route"
   Future<SmsResult> sendSms({
@@ -13,20 +11,18 @@ class SmsService {
     required String message,
   }) async {
     try {
-      // ⚠️ ERRORS_LOG: Vérifier permission SEND_SMS avant envoi
       final granted = await Permission.sms.isGranted;
       if (!granted) {
         return SmsResult.failure('Permission SMS refusée');
       }
 
-      await _telephony.sendSms(
-        to: phoneNumber,
+      final result = await sendSMS(
         message: message,
-        statusListener: (SendStatus status) {
-          debugPrint('📤 SMS status: $status');
-        },
+        recipients: [phoneNumber],
+        sendDirect: true,
       );
 
+      debugPrint('📤 SMS status: $result');
       debugPrint('✅ SMS envoyé à $contactName: "$message"');
       return SmsResult.success('SMS envoyé à $contactName');
     } catch (e) {
@@ -35,35 +31,14 @@ class SmsService {
     }
   }
 
-  /// Lire les derniers SMS reçus
-  /// Commande : "Lis mes messages" / "Nouveaux SMS"
-  Future<List<SmsMessage>> getRecentSms({int limit = 5}) async {
-    try {
-      final granted = await Permission.sms.isGranted;
-      if (!granted) return [];
-
-      final messages = await _telephony.getInboxSms(
-        columns: [
-          SmsColumn.ADDRESS,
-          SmsColumn.BODY,
-          SmsColumn.DATE,
-          SmsColumn.READ,
-        ],
-        filter: SmsFilter.where(SmsColumn.READ).equals('0'), // Non lus
-        sortOrder: [
-          OrderBy(SmsColumn.DATE, sort: Sort.DESC),
-        ],
-      );
-
-      return messages.take(limit).toList();
-    } catch (e) {
-      debugPrint('❌ SmsService.getRecentSms error: $e');
-      return [];
-    }
+  /// Lire les derniers SMS reçus (non supporté par flutter_sms)
+  Future<List<Map<String, String>>> getRecentSms({int limit = 5}) async {
+    debugPrint('ℹ️ Lecture SMS non disponible avec flutter_sms');
+    return [];
   }
 
   /// Formater les SMS pour la lecture vocale
-  String formatSmsForSpeech(List<SmsMessage> messages, String lang) {
+  String formatSmsForSpeech(List<Map<String, String>> messages, String lang) {
     if (messages.isEmpty) {
       return lang == 'fr'
           ? 'Aucun nouveau message'
@@ -76,8 +51,8 @@ class SmsService {
         : '$count new message${count > 1 ? 's' : ''}. ';
 
     final readings = messages.take(3).map((sms) {
-      final sender = sms.address ?? 'Inconnu';
-      final body = sms.body ?? '';
+      final sender = sms['address'] ?? 'Inconnu';
+      final body = sms['body'] ?? '';
       return lang == 'fr'
           ? 'De $sender: $body'
           : 'From $sender: $body';
