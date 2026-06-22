@@ -4,16 +4,12 @@ import 'package:flutter_tts/flutter_tts.dart';
 class VoiceSynthesizer {
   final FlutterTts _tts = FlutterTts();
   bool _isInitialized = false;
-  String _currentLanguage = 'fr-FR';
 
   Future<void> initialize() async {
     try {
       await _tts.setSharedInstance(true);
-
-      // ⚠️ ERRORS_LOG: Sur Android, awaitSpeakCompletion doit être true
-      // sinon les phrases se superposent
       await _tts.awaitSpeakCompletion(true);
-      await _tts.setSpeechRate(0.45);   // Vitesse naturelle
+      await _tts.setSpeechRate(0.45);
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
       await setLanguage('fr-FR');
@@ -27,11 +23,9 @@ class VoiceSynthesizer {
   }
 
   Future<void> setLanguage(String languageCode) async {
-    _currentLanguage = languageCode;
     await _tts.setLanguage(languageCode);
   }
 
-  /// Parler à l'utilisateur
   Future<void> speak(String text) async {
     if (!_isInitialized) await initialize();
     await _tts.stop();
@@ -39,7 +33,6 @@ class VoiceSynthesizer {
     await _tts.speak(text);
   }
 
-  /// Réponses prédéfinies FR + EN
   Future<void> confirmCall(String contactName, String lang) async {
     final message = lang == 'fr'
         ? 'Appel de $contactName en cours'
