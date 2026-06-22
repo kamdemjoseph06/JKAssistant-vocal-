@@ -65,12 +65,27 @@ workflows:
             echo "✅ Gradle wrapper configuré"
           fi
 
+      - name: Nettoyer cache Gradle
+        script: |
+          rm -rf android/.gradle
+          rm -rf ~/.gradle/caches/build-cache-*
+          echo "✅ Cache Gradle nettoyé"
+
       - name: Analyse du code
         script: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Build APK Debug
         script: |
-          flutter build apk --debug --verbose
+          set -o pipefail
+          flutter build apk --debug 2>&1 | tee /tmp/flutter_build.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "=== ERREURS GRADLE (dernières 100 lignes) ==="
+          tail -100 /tmp/flutter_build.log
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "=== LIGNES D'ERREUR CLÉS ==="
+            grep -E "error:|Error:|FAILED|Exception|warning:" /tmp/flutter_build.log | head -40
+            exit $EXIT_CODE
+          fi
           ls -lh build/app/outputs/flutter-apk/
 
     artifacts:
