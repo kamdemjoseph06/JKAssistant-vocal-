@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import '../database/app_database.dart';
@@ -7,7 +8,6 @@ class ContactRepository {
 
   ContactRepository(this._db);
 
-  /// Synchroniser les contacts du téléphone vers le cache SQL local
   Future<int> syncContacts() async {
     try {
       final contacts = await FlutterContacts.getContacts(
@@ -39,7 +39,6 @@ class ContactRepository {
     }
   }
 
-  /// Chercher le meilleur contact pour un nom prononcé
   Future<ContactsCacheTableData?> findContact(String spokenName) async {
     final contact = await _db.contactsDao.findBestMatch(spokenName);
     if (contact == null) {
