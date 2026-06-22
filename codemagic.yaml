@@ -7,8 +7,6 @@ workflows:
     environment:
       flutter: stable         # Dernière version stable Flutter
       java: 17                # Java 17 requis pour Android moderne
-      android_signing:
-        - vocal_assistant_key # Clé de signature (debug si absent)
 
     triggering:
       events:
