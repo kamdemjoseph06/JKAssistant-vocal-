@@ -3,8 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:vosk_flutter/vosk_flutter.dart';
 
-/// Service d'écoute permanente du mot déclencheur "Hey Vocal"
-/// Utilise VOSK (déjà installé) — aucune clé, aucun compte, 100% offline
 class HotwordService {
   static bool _isRunning = false;
   static bool get isRunning => _isRunning;
@@ -27,7 +25,6 @@ class HotwordService {
   DateTime? _lastTrigger;
   static const _cooldown = Duration(seconds: 3);
 
-  /// Initialiser le service foreground Android (API v8.x)
   static Future<void> initForegroundTask() async {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
@@ -42,7 +39,7 @@ class HotwordService {
         showNotification: true,
         playSound: false,
       ),
-      foregroundTaskOptions: const ForegroundTaskOptions(
+      foregroundTaskOptions: ForegroundTaskOptions(
         eventAction: ForegroundTaskEventAction.repeat(10000),
         autoRunOnBoot: true,
         allowWakeLock: true,
@@ -51,7 +48,6 @@ class HotwordService {
     );
   }
 
-  /// Démarrer l'écoute permanente du mot déclencheur
   Future<void> startListening({Model? sharedModel}) async {
     if (_isRunning) return;
 
@@ -79,12 +75,8 @@ class HotwordService {
 
       _speechService = await _vosk.initSpeechService(_recognizer!);
 
-      _speechService!.onResult().listen((result) {
-        _checkForHotword(result);
-      });
-      _speechService!.onPartial().listen((partial) {
-        _checkForHotword(partial);
-      });
+      _speechService!.onResult().listen(_checkForHotword);
+      _speechService!.onPartial().listen(_checkForHotword);
 
       await _speechService!.start();
       _isRunning = true;
@@ -95,15 +87,12 @@ class HotwordService {
     }
   }
 
-  /// Arrêter l'écoute
   Future<void> stopListening() async {
     if (!_isRunning) return;
-
     await _speechService?.stop();
     _speechService = null;
     _recognizer?.dispose();
     _recognizer = null;
-
     await FlutterForegroundTask.stopService();
     _isRunning = false;
     debugPrint('⏹️ HotwordService: écoute arrêtée');
@@ -112,11 +101,8 @@ class HotwordService {
   void _checkForHotword(String json) {
     final text = _extractText(json).toLowerCase().trim();
     if (text.isEmpty) return;
-
     final now = DateTime.now();
-    if (_lastTrigger != null &&
-        now.difference(_lastTrigger!) < _cooldown) return;
-
+    if (_lastTrigger != null && now.difference(_lastTrigger!) < _cooldown) return;
     for (final hotword in _hotwords) {
       if (text.contains(hotword)) {
         _lastTrigger = now;
@@ -127,7 +113,6 @@ class HotwordService {
     }
   }
 
-  /// Mots-clés passés à Vosk pour limiter le vocabulaire reconnu
   List<String> _buildGrammar() {
     final words = <String>{};
     for (final hw in _hotwords) {
@@ -154,7 +139,6 @@ class HotwordService {
   }
 }
 
-/// Callback top-level obligatoire pour Flutter Foreground Task
 @pragma('vm:entry-point')
 void _hotwordTaskCallback() {
   FlutterForegroundTask.setTaskHandler(_HotwordTaskHandler());
@@ -167,9 +151,7 @@ class _HotwordTaskHandler extends TaskHandler {
   }
 
   @override
-  void onRepeatEvent(DateTime timestamp) {
-    // Vérification périodique que le service est actif
-  }
+  void onRepeatEvent(DateTime timestamp) {}
 
   @override
   Future<void> onDestroy(DateTime timestamp) async {
