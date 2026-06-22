@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../../data/repositories/call_repository.dart';
 import '../../data/repositories/contact_repository.dart';
-import '../../data/database/tables/contacts_cache_table.dart';
+import '../../data/database/app_database.dart';
 
 // ── Résultat d'un UseCase ──────────────────────────────────
 class UseCaseResult<T> {
@@ -30,14 +30,12 @@ class MakeCallUseCase {
     required String triggeredBy,
   }) async {
     try {
-      // 1. Chercher le contact dans le cache SQL
       final contact = await _contactRepo.findContact(spokenName);
 
       if (contact == null) {
         return UseCaseResult.failure('Contact "$spokenName" introuvable');
       }
 
-      // 2. Lancer l'appel
       final success = await _callRepo.makeCall(
         phoneNumber: contact.phoneNumber,
         contactName: contact.displayName,
