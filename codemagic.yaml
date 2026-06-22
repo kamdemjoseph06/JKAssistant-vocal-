@@ -96,6 +96,8 @@ workflows:
       java: 17
       vars:
         CM_KEYSTORE_PATH: /tmp/keystore.jks
+      groups:
+        - jkassistant_signing
 
     cache:
       cache_paths:
@@ -148,10 +150,16 @@ workflows:
             chmod +x android/gradlew
           fi
 
-      - name: Décoder le Keystore
+      - name: Décoder le keystore et créer key.properties
         script: |
           echo "$CM_KEYSTORE" | base64 --decode > $CM_KEYSTORE_PATH
-          echo "✅ Keystore décodé → $CM_KEYSTORE_PATH"
+          cat > android/key.properties <<EOF
+          storePassword=$CM_KEYSTORE_PASS
+          keyPassword=$CM_KEY_PASS
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=$CM_KEYSTORE_PATH
+          EOF
+          echo "✅ Keystore décodé et key.properties créé"
 
       - name: Analyse du code
         script: flutter analyze --no-fatal-infos --no-fatal-warnings
@@ -164,19 +172,6 @@ workflows:
             --build-name=$CM_TAG \
             --build-number=$BUILD_NUMBER
           ls -lh build/app/outputs/flutter-apk/
-
-      - name: Signer l APK avec jarsigner
-        script: |
-          jarsigner \
-            -verbose \
-            -sigalg SHA256withRSA \
-            -digestalg SHA-256 \
-            -keystore $CM_KEYSTORE_PATH \
-            -storepass "$CM_KEYSTORE_PASS" \
-            -keypass "$CM_KEY_PASS" \
-            build/app/outputs/flutter-apk/app-release.apk \
-            "$CM_KEY_ALIAS"
-          echo "✅ APK signé"
 
       - name: Vérification signature APK
         script: |
