@@ -29,6 +29,7 @@ workflows:
           mkdir -p assets/models
           mkdir -p assets/animations
           mkdir -p assets/fonts
+          mkdir -p assets/sounds
           echo "✅ Dossiers assets créés"
 
       # ── Étape 3 : Télécharger modèles Vosk offline ──────────
@@ -102,7 +103,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - ton-email@exemple.com   # ← Remplace par ton email
+          - kamdemjoseph06@gmail.com
         notify:
           success: true
           failure: true
