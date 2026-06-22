@@ -19,7 +19,6 @@ class SmsService {
       final result = await sendSMS(
         message: message,
         recipients: [phoneNumber],
-        sendDirect: true,
       );
 
       debugPrint('📤 SMS status: $result');
