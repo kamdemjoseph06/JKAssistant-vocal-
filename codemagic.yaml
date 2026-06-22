@@ -8,6 +8,13 @@ workflows:
       flutter: stable
       java: 17
 
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+        - android/.gradle
+
     triggering:
       events:
         - push
@@ -31,14 +38,22 @@ workflows:
 
       - name: Télécharger modèles Vosk FR + EN
         script: |
-          wget -q https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip \
-               -O /tmp/vosk-fr.zip
-          unzip -q /tmp/vosk-fr.zip -d assets/models/
-          rm /tmp/vosk-fr.zip
-          wget -q https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip \
-               -O /tmp/vosk-en.zip
-          unzip -q /tmp/vosk-en.zip -d assets/models/
-          rm /tmp/vosk-en.zip
+          if [ -d assets/models/vosk-model-small-fr-0.22 ]; then
+            echo "✅ Modèle FR déjà en cache"
+          else
+            wget -q https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip \
+                 -O /tmp/vosk-fr.zip
+            unzip -q /tmp/vosk-fr.zip -d assets/models/
+            rm /tmp/vosk-fr.zip
+          fi
+          if [ -d assets/models/vosk-model-small-en-us-0.15 ]; then
+            echo "✅ Modèle EN déjà en cache"
+          else
+            wget -q https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip \
+                 -O /tmp/vosk-en.zip
+            unzip -q /tmp/vosk-en.zip -d assets/models/
+            rm /tmp/vosk-en.zip
+          fi
           ls -lh assets/models/
 
       - name: Flutter pub get
@@ -47,11 +62,9 @@ workflows:
 
       - name: Configurer Gradle wrapper (gradlew + jar)
         script: |
-          # Générer gradlew et gradle-wrapper.jar via un projet Flutter temporaire
           flutter create --project-name wrapper_gen /tmp/flutter_wrapper_gen \
             --no-pub --platforms android 2>/dev/null || true
 
-          # Copier gradlew et gradle-wrapper.jar depuis le projet temporaire
           if [ -f /tmp/flutter_wrapper_gen/android/gradlew ]; then
             cp /tmp/flutter_wrapper_gen/android/gradlew android/gradlew
             cp /tmp/flutter_wrapper_gen/android/gradlew.bat android/gradlew.bat 2>/dev/null || true
@@ -65,7 +78,6 @@ workflows:
             mkdir -p android/gradle/wrapper
             curl -fsSL "https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar" \
                  -o android/gradle/wrapper/gradle-wrapper.jar
-            # Créer gradlew minimal
             cat > android/gradlew << 'GRADLEW'
           #!/bin/sh
           SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
