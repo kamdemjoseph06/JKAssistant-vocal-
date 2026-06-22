@@ -55,8 +55,8 @@ dependencies:
   wakelock_plus: ^1.2.8
   screen_brightness: ^1.0.1
 
-  # ── UI ─────────────────────────────────────────────────────
-  google_fonts: ^6.2.1
+  # ── UI (google_fonts 4.x compatible http ^0.13.x) ──────────
+  google_fonts: ^4.0.4
   animations: ^2.0.11
   flutter_animate: ^4.5.0
   lottie: ^3.1.2
