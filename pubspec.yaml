@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
 
   # ── Reconnaissance vocale OFFLINE ──────────────────────────
-  vosk_flutter: ^0.3.48
+  vosk_flutter: ^0.3.48          # requiert http ^0.13.5
 
   # ── Synthèse vocale OFFLINE ────────────────────────────────
   flutter_tts: ^3.8.5
@@ -39,7 +39,7 @@ dependencies:
   # ── Injection de dépendances ───────────────────────────────
   get_it: ^7.7.0
 
-  # ── SMS (^3.0.1 requis pour Dart 3 - ^2.x incompatible) ───
+  # ── SMS (Dart 3 compatible) ────────────────────────────────
   flutter_sms: ^3.0.1
 
   # ── Réveil / Minuterie ─────────────────────────────────────
@@ -55,11 +55,11 @@ dependencies:
   wakelock_plus: ^1.2.8
   screen_brightness: ^1.0.1
 
-  # ── UI (google_fonts 4.x compatible http ^0.13.x) ──────────
-  google_fonts: ^4.0.4
+  # ── UI ─────────────────────────────────────────────────────
+  google_fonts: ^4.0.4           # http ^0.13.0 - compatible vosk
   animations: ^2.0.11
   flutter_animate: ^4.5.0
-  lottie: ^3.1.2
+  lottie: ^2.7.0                 # pas de dep http - compatible vosk
 
 dev_dependencies:
   flutter_test:
