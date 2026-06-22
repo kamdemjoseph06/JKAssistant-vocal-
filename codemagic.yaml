@@ -1,7 +1,10 @@
 workflows:
 
+  # ══════════════════════════════════════════════════════════
+  # WORKFLOW 1 : DEBUG — déclenché à chaque push sur main
+  # ══════════════════════════════════════════════════════════
   vocal-assistant-android:
-    name: Vocal Assistant - APK Android
+    name: Vocal Assistant - APK Debug
     max_build_duration: 60
 
     environment:
@@ -25,75 +28,48 @@ workflows:
     scripts:
 
       - name: Vérification Flutter
-        script: |
-          flutter --version
+        script: flutter --version
 
       - name: Créer dossiers assets
         script: |
-          mkdir -p assets/models
-          mkdir -p assets/animations
-          mkdir -p assets/fonts
-          mkdir -p assets/sounds
+          mkdir -p assets/models assets/animations assets/fonts assets/sounds
           echo "Dossiers assets créés"
 
       - name: Télécharger modèles Vosk FR + EN
         script: |
-          if [ -d assets/models/vosk-model-small-fr-0.22 ]; then
-            echo "✅ Modèle FR déjà en cache"
+          if [ ! -d assets/models/vosk-model-small-fr-0.22 ]; then
+            wget -q https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip -O /tmp/vosk-fr.zip
+            unzip -q /tmp/vosk-fr.zip -d assets/models/ && rm /tmp/vosk-fr.zip
           else
-            wget -q https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip \
-                 -O /tmp/vosk-fr.zip
-            unzip -q /tmp/vosk-fr.zip -d assets/models/
-            rm /tmp/vosk-fr.zip
+            echo "✅ Modèle FR en cache"
           fi
-          if [ -d assets/models/vosk-model-small-en-us-0.15 ]; then
-            echo "✅ Modèle EN déjà en cache"
+          if [ ! -d assets/models/vosk-model-small-en-us-0.15 ]; then
+            wget -q https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip -O /tmp/vosk-en.zip
+            unzip -q /tmp/vosk-en.zip -d assets/models/ && rm /tmp/vosk-en.zip
           else
-            wget -q https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip \
-                 -O /tmp/vosk-en.zip
-            unzip -q /tmp/vosk-en.zip -d assets/models/
-            rm /tmp/vosk-en.zip
+            echo "✅ Modèle EN en cache"
           fi
           ls -lh assets/models/
 
       - name: Flutter pub get
-        script: |
-          flutter pub get
+        script: flutter pub get
 
-      - name: Configurer Gradle wrapper (gradlew + jar)
+      - name: Configurer Gradle wrapper
         script: |
-          flutter create --project-name wrapper_gen /tmp/flutter_wrapper_gen \
-            --no-pub --platforms android 2>/dev/null || true
-
+          flutter create --project-name wrapper_gen /tmp/flutter_wrapper_gen --no-pub --platforms android 2>/dev/null || true
           if [ -f /tmp/flutter_wrapper_gen/android/gradlew ]; then
             cp /tmp/flutter_wrapper_gen/android/gradlew android/gradlew
-            cp /tmp/flutter_wrapper_gen/android/gradlew.bat android/gradlew.bat 2>/dev/null || true
             mkdir -p android/gradle/wrapper
-            cp /tmp/flutter_wrapper_gen/android/gradle/wrapper/gradle-wrapper.jar \
-               android/gradle/wrapper/gradle-wrapper.jar
+            cp /tmp/flutter_wrapper_gen/android/gradle/wrapper/gradle-wrapper.jar android/gradle/wrapper/gradle-wrapper.jar
             chmod +x android/gradlew
-            echo "✅ Gradle wrapper configuré depuis Flutter template"
-          else
-            echo "⚠️  Fallback: téléchargement direct gradle-wrapper.jar"
-            mkdir -p android/gradle/wrapper
-            curl -fsSL "https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar" \
-                 -o android/gradle/wrapper/gradle-wrapper.jar
-            cat > android/gradlew << 'GRADLEW'
-          #!/bin/sh
-          SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-          exec java -jar "$SCRIPT_DIR/gradle/wrapper/gradle-wrapper.jar" "$@"
-          GRADLEW
-            chmod +x android/gradlew
+            echo "✅ Gradle wrapper configuré"
           fi
-          ls -lh android/gradlew android/gradle/wrapper/gradle-wrapper.jar
 
-      - name: Générer fichiers Drift (build_runner)
-        script: |
-          dart run build_runner build --delete-conflicting-outputs
+      - name: Générer fichiers Drift
+        script: dart run build_runner build --delete-conflicting-outputs
 
       - name: Analyse du code
-        script: |
-          flutter analyze --no-fatal-infos
+        script: flutter analyze --no-fatal-infos
 
       - name: Build APK Debug
         script: |
@@ -102,7 +78,127 @@ workflows:
 
     artifacts:
       - build/app/outputs/flutter-apk/app-debug.apk
-      - build/app/outputs/flutter-apk/*.apk
+
+    publishing:
+      email:
+        recipients:
+          - kamdemjoseph06@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  # ══════════════════════════════════════════════════════════
+  # WORKFLOW 2 : RELEASE — déclenché manuellement ou sur tag
+  # APK signé prêt pour le Play Store
+  # ══════════════════════════════════════════════════════════
+  vocal-assistant-release:
+    name: Vocal Assistant - APK Release (signé)
+    max_build_duration: 90
+
+    environment:
+      flutter: stable
+      java: 17
+      # Secrets à configurer dans Codemagic → App settings → Environment variables
+      # CM_KEYSTORE        : fichier keystore encodé en base64
+      # CM_KEYSTORE_PASS   : mot de passe du keystore
+      # CM_KEY_ALIAS       : alias de la clé
+      # CM_KEY_PASS        : mot de passe de la clé
+      vars:
+        CM_KEYSTORE_PATH: /tmp/keystore.jks
+
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+        - android/.gradle
+
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: v*
+          include: true
+
+    scripts:
+
+      - name: Vérification Flutter
+        script: flutter --version
+
+      - name: Créer dossiers assets
+        script: |
+          mkdir -p assets/models assets/animations assets/fonts assets/sounds
+
+      - name: Télécharger modèles Vosk FR + EN
+        script: |
+          if [ ! -d assets/models/vosk-model-small-fr-0.22 ]; then
+            wget -q https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip -O /tmp/vosk-fr.zip
+            unzip -q /tmp/vosk-fr.zip -d assets/models/ && rm /tmp/vosk-fr.zip
+          else
+            echo "✅ Modèle FR en cache"
+          fi
+          if [ ! -d assets/models/vosk-model-small-en-us-0.15 ]; then
+            wget -q https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip -O /tmp/vosk-en.zip
+            unzip -q /tmp/vosk-en.zip -d assets/models/ && rm /tmp/vosk-en.zip
+          else
+            echo "✅ Modèle EN en cache"
+          fi
+
+      - name: Flutter pub get
+        script: flutter pub get
+
+      - name: Configurer Gradle wrapper
+        script: |
+          flutter create --project-name wrapper_gen /tmp/flutter_wrapper_gen --no-pub --platforms android 2>/dev/null || true
+          if [ -f /tmp/flutter_wrapper_gen/android/gradlew ]; then
+            cp /tmp/flutter_wrapper_gen/android/gradlew android/gradlew
+            mkdir -p android/gradle/wrapper
+            cp /tmp/flutter_wrapper_gen/android/gradle/wrapper/gradle-wrapper.jar android/gradle/wrapper/gradle-wrapper.jar
+            chmod +x android/gradlew
+          fi
+
+      - name: Décoder le Keystore depuis la variable Codemagic
+        script: |
+          echo "$CM_KEYSTORE" | base64 --decode > $CM_KEYSTORE_PATH
+          echo "✅ Keystore décodé → $CM_KEYSTORE_PATH"
+
+      - name: Générer fichiers Drift
+        script: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Analyse du code
+        script: flutter analyze --no-fatal-infos
+
+      - name: Build APK Release signé
+        script: |
+          flutter build apk --release \
+            --obfuscate \
+            --split-debug-info=build/debug-info \
+            --build-name=$CM_TAG \
+            --build-number=$BUILD_NUMBER
+          ls -lh build/app/outputs/flutter-apk/
+
+      - name: Signer l APK avec jarsigner
+        script: |
+          jarsigner \
+            -verbose \
+            -sigalg SHA256withRSA \
+            -digestalg SHA-256 \
+            -keystore $CM_KEYSTORE_PATH \
+            -storepass "$CM_KEYSTORE_PASS" \
+            -keypass "$CM_KEY_PASS" \
+            build/app/outputs/flutter-apk/app-release.apk \
+            "$CM_KEY_ALIAS"
+          echo "✅ APK signé"
+
+      - name: Vérification signature APK
+        script: |
+          jarsigner -verify -verbose -certs \
+            build/app/outputs/flutter-apk/app-release.apk
+          echo "✅ Signature valide"
+
+    artifacts:
+      - build/app/outputs/flutter-apk/app-release.apk
+      - build/debug-info/**
 
     publishing:
       email:
