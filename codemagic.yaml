@@ -21,7 +21,7 @@ workflows:
       - name: Vérification Flutter
         script: |
           flutter --version
-          flutter doctor -v
+          
 
       # ── Étape 2 : Créer les dossiers assets ─────────────────
       - name: Créer dossiers assets
