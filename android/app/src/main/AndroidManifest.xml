@@ -1,26 +1,42 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- ── Permissions microphone ── -->
+    <!-- ── Microphone (reconnaissance vocale Vosk) ── -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
-    <!-- ── Permissions appels ── -->
+    <!-- ── Appels téléphoniques ── -->
     <uses-permission android:name="android.permission.CALL_PHONE"/>
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS"/>
     <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
     <uses-permission android:name="android.permission.READ_CALL_LOG"/>
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
 
-    <!-- ── Permissions contacts ── -->
+    <!-- ── Contacts ── -->
     <uses-permission android:name="android.permission.READ_CONTACTS"/>
 
-    <!-- ── Réseau (désactivé offline, mais gardé pour sync future) ── -->
+    <!-- ── SMS (flutter_sms) ── -->
+    <uses-permission android:name="android.permission.SEND_SMS"/>
+    <uses-permission android:name="android.permission.READ_SMS"/>
+    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
+
+    <!-- ── Réseau (future sync, Vosk download) ── -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
-    <!-- ── Démarrage au boot pour écoute vocale ── -->
+    <!-- ── Réveil / Alarme (android_alarm_manager_plus) ── -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+
+    <!-- ── Notifications (flutter_local_notifications, Android 13+) ── -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+
+    <!-- ── Service foreground (flutter_foreground_task / hotword) ── -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
+
+    <!-- ── Mode voiture / écran allumé (wakelock_plus) ── -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
     <application
         android:label="VocalAssist"
@@ -46,11 +62,28 @@
             </intent-filter>
         </activity>
 
-        <!-- Service écoute vocale en arrière-plan -->
+        <!--
+            Service foreground pour flutter_foreground_task (hotword "Hey Vocal").
+            Le type microphone est requis sur Android 14+ (API 34+).
+            La classe est fournie par le package flutter_foreground_task via AAR merge.
+        -->
         <service
-            android:name=".VoiceListenerService"
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
             android:foregroundServiceType="microphone"
             android:exported="false"/>
+
+        <!--
+            Receiver pour android_alarm_manager_plus (réveil/minuterie).
+            Requis sur Android 12+ pour les alarmes exactes avec RECEIVE_BOOT_COMPLETED.
+        -->
+        <receiver
+            android:name="dev.fluttercommunity.plus.androidalarmmanager.AlarmBroadcastReceiver"
+            android:exported="false"/>
+
+        <service
+            android:name="dev.fluttercommunity.plus.androidalarmmanager.AlarmService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE"/>
 
         <meta-data
             android:name="flutterEmbedding"
