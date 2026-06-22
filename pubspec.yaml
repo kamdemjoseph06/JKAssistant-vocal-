@@ -39,8 +39,8 @@ dependencies:
   # ── Injection de dépendances ───────────────────────────────
   get_it: ^7.7.0
 
-  # ── SMS ────────────────────────────────────────────────────
-  flutter_sms: ^2.3.2
+  # ── SMS (^3.0.1 requis pour Dart 3 - ^2.x incompatible) ───
+  flutter_sms: ^3.0.1
 
   # ── Réveil / Minuterie ─────────────────────────────────────
   flutter_local_notifications: ^17.2.2
