@@ -65,9 +65,6 @@ workflows:
             echo "✅ Gradle wrapper configuré"
           fi
 
-      - name: Générer fichiers Drift
-        script: dart run build_runner build --delete-conflicting-outputs
-
       - name: Analyse du code
         script: flutter analyze --no-fatal-infos --no-fatal-warnings
 
@@ -155,9 +152,6 @@ workflows:
         script: |
           echo "$CM_KEYSTORE" | base64 --decode > $CM_KEYSTORE_PATH
           echo "✅ Keystore décodé → $CM_KEYSTORE_PATH"
-
-      - name: Générer fichiers Drift
-        script: dart run build_runner build --delete-conflicting-outputs
 
       - name: Analyse du code
         script: flutter analyze --no-fatal-infos --no-fatal-warnings
