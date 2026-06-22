@@ -1,8 +1,6 @@
-import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import '../database/app_database.dart';
-import '../database/tables/contacts_cache_table.dart';
 
 class ContactRepository {
   final AppDatabase _db;
@@ -52,15 +50,12 @@ class ContactRepository {
     return contact;
   }
 
-  /// Nombre de contacts en cache
   Future<int> getCachedCount() => _db.contactsDao.count();
 
-  /// Nettoyer le numéro de téléphone
   String _cleanPhone(String raw) {
     return raw.replaceAll(RegExp(r'[\s\-\.\(\)]'), '');
   }
 
-  /// Normaliser le nom pour la recherche (sans accents, minuscule)
   String _normalize(String input) {
     return input
         .toLowerCase()
