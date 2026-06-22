@@ -40,7 +40,7 @@ dependencies:
   get_it: ^7.7.0
 
   # ── SMS (Dart 3 compatible) ────────────────────────────────
-  flutter_sms: ^3.0.1
+  flutter_sms: ^2.3.3
 
   # ── Réveil / Minuterie ─────────────────────────────────────
   flutter_local_notifications: ^17.2.2
