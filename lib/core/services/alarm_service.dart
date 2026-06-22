@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
-import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 
 class AlarmService {
@@ -39,7 +38,6 @@ class AlarmService {
     final now = DateTime.now();
     final text = timeText.toLowerCase().trim();
 
-    // ── Cas spéciaux FR ──
     if (text == 'midi') {
       return DateTime(now.year, now.month, now.day, 12, 0);
     }
@@ -47,7 +45,6 @@ class AlarmService {
       return DateTime(now.year, now.month, now.day + 1, 0, 0);
     }
 
-    // ── Format "8h30" ou "8h" ──
     final hhmm = RegExp(r'^(\d{1,2})h(\d{2})?$').firstMatch(text);
     if (hhmm != null) {
       final hour = int.parse(hhmm.group(1)!);
@@ -57,7 +54,6 @@ class AlarmService {
       return dt;
     }
 
-    // ── Format "8:30" ──
     final colon = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(text);
     if (colon != null) {
       final hour = int.parse(colon.group(1)!);
@@ -67,7 +63,6 @@ class AlarmService {
       return dt;
     }
 
-    // ── Format "7 heures" / "7 hours" ──
     final heures = RegExp(r'^(\d{1,2})\s+(?:heures?|hours?)$').firstMatch(text);
     if (heures != null) {
       final hour = int.parse(heures.group(1)!);
@@ -76,7 +71,6 @@ class AlarmService {
       return dt;
     }
 
-    // ── Format "7 heures 30" ──
     final heuresMin = RegExp(
             r'^(\d{1,2})\s+(?:heures?|hours?)\s+(?:et\s+)?(\d{1,2})(?:\s+(?:minutes?|mins?))?$')
         .firstMatch(text);
@@ -93,30 +87,18 @@ class AlarmService {
   }
 
   /// Parser une durée depuis du texte vocal
-  /// Exemples : "5 minutes", "30 secondes", "2 heures"
   Duration? parseDuration(String timeText) {
     final text = timeText.toLowerCase().trim();
 
-    // "5 minutes" / "5 mins"
     final mins = RegExp(r'^(\d+)\s+(?:minutes?|mins?)$').firstMatch(text);
-    if (mins != null) {
-      return Duration(minutes: int.parse(mins.group(1)!));
-    }
+    if (mins != null) return Duration(minutes: int.parse(mins.group(1)!));
 
-    // "30 secondes" / "30 seconds"
-    final secs =
-        RegExp(r'^(\d+)\s+(?:secondes?|seconds?|secs?)$').firstMatch(text);
-    if (secs != null) {
-      return Duration(seconds: int.parse(secs.group(1)!));
-    }
+    final secs = RegExp(r'^(\d+)\s+(?:secondes?|seconds?|secs?)$').firstMatch(text);
+    if (secs != null) return Duration(seconds: int.parse(secs.group(1)!));
 
-    // "2 heures" / "2 hours"
     final hrs = RegExp(r'^(\d+)\s+(?:heures?|hours?)$').firstMatch(text);
-    if (hrs != null) {
-      return Duration(hours: int.parse(hrs.group(1)!));
-    }
+    if (hrs != null) return Duration(hours: int.parse(hrs.group(1)!));
 
-    // "1 heure 30" / "1 hour 30"
     final hrsMin = RegExp(
             r'^(\d+)\s+(?:heures?|hours?)\s+(?:et\s+)?(\d+)\s+(?:minutes?|mins?)?$')
         .firstMatch(text);
@@ -144,7 +126,6 @@ class AlarmService {
     try {
       const int alarmId = 1;
 
-      // Programmer l'alarme native Android
       await AndroidAlarmManager.oneShotAt(
         alarmTime,
         alarmId,
@@ -154,16 +135,13 @@ class AlarmService {
         rescheduleOnReboot: true,
       );
 
-      // Afficher une notification confirmant l'alarme
       final timeFormatted =
           '${alarmTime.hour.toString().padLeft(2, '0')}:${alarmTime.minute.toString().padLeft(2, '0')}';
 
       await _showConfirmNotification(
         id: alarmId,
         title: lang == 'fr' ? '⏰ Réveil programmé' : '⏰ Alarm set',
-        body: lang == 'fr'
-            ? 'Réveil à $timeFormatted'
-            : 'Alarm at $timeFormatted',
+        body: lang == 'fr' ? 'Réveil à $timeFormatted' : 'Alarm at $timeFormatted',
       );
 
       final msg = lang == 'fr'
@@ -178,7 +156,7 @@ class AlarmService {
     }
   }
 
-  /// Créer une minuterie (compte à rebours)
+  /// Créer une minuterie
   Future<AlarmResult> setTimer(String timeText, String lang) async {
     final duration = parseDuration(timeText);
 
@@ -201,7 +179,6 @@ class AlarmService {
         wakeup: true,
       );
 
-      // Formater la durée pour le retour vocal
       String durationStr;
       if (duration.inHours > 0) {
         durationStr = lang == 'fr'
@@ -220,9 +197,7 @@ class AlarmService {
       await _showConfirmNotification(
         id: timerId,
         title: lang == 'fr' ? '⏱️ Minuterie démarrée' : '⏱️ Timer started',
-        body: lang == 'fr'
-            ? 'Minuterie de $durationStr'
-            : 'Timer for $durationStr',
+        body: lang == 'fr' ? 'Minuterie de $durationStr' : 'Timer for $durationStr',
       );
 
       final msg = lang == 'fr'
@@ -237,7 +212,6 @@ class AlarmService {
     }
   }
 
-  /// Annuler le réveil / la minuterie
   Future<void> cancelAlarm() async {
     await AndroidAlarmManager.cancel(1);
     await AndroidAlarmManager.cancel(2);
@@ -245,7 +219,6 @@ class AlarmService {
     debugPrint('✅ Alarmes annulées');
   }
 
-  /// Notification de confirmation
   Future<void> _showConfirmNotification({
     required int id,
     required String title,
@@ -268,17 +241,14 @@ class AlarmService {
     );
   }
 
-  // Callbacks statiques pour Android Alarm Manager
   @pragma('vm:entry-point')
   static void _alarmCallback() {
     debugPrint('⏰ RÉVEIL DÉCLENCHÉ');
-    // TODO: Jouer le son de réveil + notification
   }
 
   @pragma('vm:entry-point')
   static void _timerCallback() {
     debugPrint('⏱️ MINUTERIE TERMINÉE');
-    // TODO: Jouer le son de minuterie + notification
   }
 }
 
