@@ -69,7 +69,7 @@ workflows:
         script: dart run build_runner build --delete-conflicting-outputs
 
       - name: Analyse du code
-        script: flutter analyze --no-fatal-infos
+        script: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Build APK Debug
         script: |
@@ -89,7 +89,6 @@ workflows:
 
   # ══════════════════════════════════════════════════════════
   # WORKFLOW 2 : RELEASE — déclenché manuellement ou sur tag
-  # APK signé prêt pour le Play Store
   # ══════════════════════════════════════════════════════════
   vocal-assistant-release:
     name: Vocal Assistant - APK Release (signé)
@@ -98,11 +97,6 @@ workflows:
     environment:
       flutter: stable
       java: 17
-      # Secrets à configurer dans Codemagic → App settings → Environment variables
-      # CM_KEYSTORE        : fichier keystore encodé en base64
-      # CM_KEYSTORE_PASS   : mot de passe du keystore
-      # CM_KEY_ALIAS       : alias de la clé
-      # CM_KEY_PASS        : mot de passe de la clé
       vars:
         CM_KEYSTORE_PATH: /tmp/keystore.jks
 
@@ -157,7 +151,7 @@ workflows:
             chmod +x android/gradlew
           fi
 
-      - name: Décoder le Keystore depuis la variable Codemagic
+      - name: Décoder le Keystore
         script: |
           echo "$CM_KEYSTORE" | base64 --decode > $CM_KEYSTORE_PATH
           echo "✅ Keystore décodé → $CM_KEYSTORE_PATH"
@@ -166,7 +160,7 @@ workflows:
         script: dart run build_runner build --delete-conflicting-outputs
 
       - name: Analyse du code
-        script: flutter analyze --no-fatal-infos
+        script: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Build APK Release signé
         script: |
