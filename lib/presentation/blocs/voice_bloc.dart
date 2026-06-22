@@ -403,26 +403,6 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     emit(state.copyWith(contactsCount: result.data ?? 0, contactsSynced: result.success));
   }
 
-  String _buildSuggestion(VoiceCommand command, String lang) {
-    return switch (command.action) {
-      CommandAction.call => lang == "fr"
-          ? "Appeler ${command.contactName ?? "?"}"
-          : "Call ${command.contactName ?? "?"}",
-      CommandAction.sendSms => lang == "fr"
-          ? "SMS a ${command.contactName ?? "?"}"
-          : "Text ${command.contactName ?? "?"}",
-      CommandAction.setAlarm => lang == "fr"
-          ? "Reveil a ${command.timeText ?? "?"}"
-          : "Alarm at ${command.timeText ?? "?"}",
-      CommandAction.setTimer => lang == "fr"
-          ? "Minuterie ${command.timeText ?? "?"}"
-          : "Timer ${command.timeText ?? "?"}",
-      CommandAction.hangup => lang == "fr" ? "Raccrocher" : "Hang up",
-      CommandAction.answer => lang == "fr" ? "Decrocher" : "Answer",
-      _ => command.rawText,
-    };
-  }
-
   @override
   Future<void> close() {
     _resultSub?.cancel();
