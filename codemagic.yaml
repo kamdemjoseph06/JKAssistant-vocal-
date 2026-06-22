@@ -45,6 +45,36 @@ workflows:
         script: |
           flutter pub get
 
+      - name: Configurer Gradle wrapper (gradlew + jar)
+        script: |
+          # Générer gradlew et gradle-wrapper.jar via un projet Flutter temporaire
+          flutter create --project-name wrapper_gen /tmp/flutter_wrapper_gen \
+            --no-pub --platforms android 2>/dev/null || true
+
+          # Copier gradlew et gradle-wrapper.jar depuis le projet temporaire
+          if [ -f /tmp/flutter_wrapper_gen/android/gradlew ]; then
+            cp /tmp/flutter_wrapper_gen/android/gradlew android/gradlew
+            cp /tmp/flutter_wrapper_gen/android/gradlew.bat android/gradlew.bat 2>/dev/null || true
+            mkdir -p android/gradle/wrapper
+            cp /tmp/flutter_wrapper_gen/android/gradle/wrapper/gradle-wrapper.jar \
+               android/gradle/wrapper/gradle-wrapper.jar
+            chmod +x android/gradlew
+            echo "✅ Gradle wrapper configuré depuis Flutter template"
+          else
+            echo "⚠️  Fallback: téléchargement direct gradle-wrapper.jar"
+            mkdir -p android/gradle/wrapper
+            curl -fsSL "https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar" \
+                 -o android/gradle/wrapper/gradle-wrapper.jar
+            # Créer gradlew minimal
+            cat > android/gradlew << 'GRADLEW'
+          #!/bin/sh
+          SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+          exec java -jar "$SCRIPT_DIR/gradle/wrapper/gradle-wrapper.jar" "$@"
+          GRADLEW
+            chmod +x android/gradlew
+          fi
+          ls -lh android/gradlew android/gradle/wrapper/gradle-wrapper.jar
+
       - name: Générer fichiers Drift (build_runner)
         script: |
           dart run build_runner build --delete-conflicting-outputs
