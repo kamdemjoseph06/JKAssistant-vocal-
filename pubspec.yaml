@@ -18,7 +18,7 @@ dependencies:
 
   # ── Téléphone & Appels ─────────────────────────────────────
   flutter_phone_state: ^1.0.4
-  url_launcher: ^6.2.5          # Lancer un appel via tel:
+  url_launcher: ^6.2.5          # Lancer un appel via tel+WhatsApp :
 
   # ── Répertoire / Contacts ──────────────────────────────────
   flutter_contacts: ^1.1.9+1
@@ -44,7 +44,7 @@ dependencies:
   flutter_sms: ^2.3.2           # Envoi SMS alternatif
 
   # ── WhatsApp ───────────────────────────────────────────────
-  url_launcher: ^6.2.5          # Ouvrir WhatsApp via URL
+         # Ouvrir WhatsApp via URL
 
   # ── Réveil / Minuterie ─────────────────────────────────────
   flutter_local_notifications: ^17.2.2  # Notifications locales
