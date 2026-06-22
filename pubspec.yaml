@@ -16,9 +16,9 @@ dependencies:
   # ── Synthèse vocale OFFLINE ────────────────────────────────
   flutter_tts: ^3.8.5
 
-  # ── Téléphone & Appels ─────────────────────────────────────
-  flutter_phone_state: ^1.0.4
-  url_launcher: ^6.2.5          # Lancer un appel via tel+WhatsApp :
+  # ── Téléphone & Appels + WhatsApp ─────────────────────────
+  phone_state: ^2.0.0
+  url_launcher: ^6.2.5
 
   # ── Répertoire / Contacts ──────────────────────────────────
   flutter_contacts: ^1.1.9+1
@@ -40,24 +40,20 @@ dependencies:
   get_it: ^7.7.0
 
   # ── SMS ────────────────────────────────────────────────────
-  telephony: ^0.2.0             # Envoyer et lire les SMS
-  flutter_sms: ^2.3.2           # Envoi SMS alternatif
+  flutter_sms: ^2.3.2
 
   # ── Réveil / Minuterie ─────────────────────────────────────
-  flutter_local_notifications: ^17.2.2  # Notifications locales
-  android_alarm_manager_plus: ^3.0.4    # Réveil natif Android
-  timezone: ^0.9.4                      # Gestion fuseaux horaires
-
-  # ── Hotword / Écoute permanente ────────────────────────────
-  # Utilise Vosk (déjà installé) — aucune clé, aucun compte ✅
+  flutter_local_notifications: ^17.2.2
+  android_alarm_manager_plus: ^3.0.4
+  timezone: ^0.9.4
 
   # ── Service arrière-plan ───────────────────────────────────
-  flutter_foreground_task: ^8.8.0  # Service écoute permanent
-  connectivity_plus: ^6.0.3        # Détection réseau
+  flutter_foreground_task: ^8.8.0
+  connectivity_plus: ^6.0.3
 
   # ── Mode voiture ───────────────────────────────────────────
-  wakelock_plus: ^1.2.8         # Garder écran allumé
-  screen_brightness: ^1.0.1     # Luminosité auto
+  wakelock_plus: ^1.2.8
+  screen_brightness: ^1.0.1
 
   # ── UI ─────────────────────────────────────────────────────
   google_fonts: ^6.2.1
