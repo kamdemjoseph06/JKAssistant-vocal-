@@ -62,6 +62,7 @@ class VoiceState extends Equatable {
   final bool carModeActive;
   final bool hotwordActive;
   final String? pendingConfirmation;
+  final VoiceCommand? pendingCommand;
   final double lastConfidence;
 
   const VoiceState({
@@ -76,6 +77,7 @@ class VoiceState extends Equatable {
     this.carModeActive = false,
     this.hotwordActive = false,
     this.pendingConfirmation,
+    this.pendingCommand,
     this.lastConfidence = 0.0,
   });
 
@@ -84,7 +86,8 @@ class VoiceState extends Equatable {
     String? lastCommand, String? errorMessage, VoiceLanguage? language,
     bool? contactsSynced, int? contactsCount,
     bool? carModeActive, bool? hotwordActive,
-    String? pendingConfirmation, double? lastConfidence,
+    String? pendingConfirmation, VoiceCommand? pendingCommand,
+    double? lastConfidence,
   }) => VoiceState(
     status: status ?? this.status,
     displayText: displayText ?? this.displayText,
@@ -96,14 +99,16 @@ class VoiceState extends Equatable {
     contactsCount: contactsCount ?? this.contactsCount,
     carModeActive: carModeActive ?? this.carModeActive,
     hotwordActive: hotwordActive ?? this.hotwordActive,
-      pendingConfirmation: pendingConfirmation ?? this.pendingConfirmation,
-      lastConfidence: lastConfidence ?? this.lastConfidence,
+    pendingConfirmation: pendingConfirmation ?? this.pendingConfirmation,
+    pendingCommand: pendingCommand ?? this.pendingCommand,
+    lastConfidence: lastConfidence ?? this.lastConfidence,
   );
 
   @override
   List<Object?> get props => [
     status, displayText, partialText, lastCommand, errorMessage,
-    language, contactsSynced, contactsCount, carModeActive, hotwordActive, pendingConfirmation, lastConfidence,
+    language, contactsSynced, contactsCount, carModeActive, hotwordActive,
+    pendingConfirmation, pendingCommand, lastConfidence,
   ];
 }
 
@@ -348,7 +353,6 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     }
   }
 
-  
   Future<void> _onConfirmed(VoiceConfirmed event, Emitter<VoiceState> emit) async {
     if (state.pendingCommand != null) {
       await _executeCommand(state.pendingCommand!, emit);
@@ -360,13 +364,33 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     await _synthesizer.speak("D accord, je recommence");
     emit(state.copyWith(
       pendingConfirmation: null,
+      pendingCommand: null,
       status: AssistantStatus.ready,
       displayText: "J ecoute de nouveau...",
     ));
   }
 
+  Future<void> _executeCommand(VoiceCommand command, Emitter<VoiceState> emit) async {
+    switch (command.action) {
+      case CommandAction.call:
+        await _handleCall(command, emit);
+      case CommandAction.sendSms:
+        await _handleSendSms(command, emit);
+      case CommandAction.whatsappMessage:
+        await _handleWhatsappMessage(command, emit);
+      case CommandAction.whatsappCall:
+        await _handleWhatsappCall(command, emit);
+      case CommandAction.setAlarm:
+        await _handleSetAlarm(command, emit);
+      case CommandAction.setTimer:
+        await _handleSetTimer(command, emit);
+      default:
+        break;
+    }
+  }
+
   void _onPartialReceived(VoicePartialReceived event, Emitter<VoiceState> emit) {
-    emit(state.copyWith(partialText: event.text));
+    emit(state.copyWith(partialText: event.partial));
   }
 
   Future<void> _onLanguageChanged(VoiceLanguageChanged event, Emitter<VoiceState> emit) async {
@@ -378,8 +402,6 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     final result = await _syncContactsUseCase.execute();
     emit(state.copyWith(contactsCount: result.data ?? 0, contactsSynced: result.success));
   }
-
-  @override
 
   String _buildSuggestion(VoiceCommand command, String lang) {
     return switch (command.action) {
@@ -400,6 +422,8 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       _ => command.rawText,
     };
   }
+
+  @override
   Future<void> close() {
     _resultSub?.cancel();
     _partialSub?.cancel();
