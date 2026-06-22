@@ -3,7 +3,6 @@ import '../app_database.dart';
 import '../tables/contacts_cache_table.dart';
 
 part 'contacts_dao.g.dart';
-part 'voice_commands_dao.g.dart';
 
 @DriftAccessor(tables: [ContactsCacheTable])
 class ContactsDao extends DatabaseAccessor<AppDatabase>
@@ -23,7 +22,6 @@ class ContactsDao extends DatabaseAccessor<AppDatabase>
     final normalized = _normalize(spokenName);
     final results = await searchByName(normalized);
     if (results.isEmpty) return null;
-    // Retourne la correspondance la plus courte (la plus précise)
     results.sort((a, b) =>
         a.normalizedName.length.compareTo(b.normalizedName.length));
     return results.first;
@@ -59,24 +57,4 @@ class ContactsDao extends DatabaseAccessor<AppDatabase>
         .replaceAll(RegExp(r'[ç]'), 'c')
         .trim();
   }
-}
-
-@DriftAccessor(tables: [VoiceCommandsTable])
-class VoiceCommandsDao extends DatabaseAccessor<AppDatabase>
-    with _$VoiceCommandsDaoMixin {
-  VoiceCommandsDao(super.db);
-
-  /// Récupérer toutes les commandes actives pour une langue
-  Future<List<VoiceCommandsTableData>> getCommandsForLanguage(
-          String language) =>
-      (select(voiceCommandsTable)
-            ..where((t) =>
-                t.language.equals(language) & t.isActive.equals(true)))
-          .get();
-
-  /// Récupérer toutes les commandes actives (FR + EN)
-  Future<List<VoiceCommandsTableData>> getAllActiveCommands() =>
-      (select(voiceCommandsTable)
-            ..where((t) => t.isActive.equals(true)))
-          .get();
 }
