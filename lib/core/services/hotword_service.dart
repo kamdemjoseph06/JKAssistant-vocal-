@@ -37,11 +37,10 @@ class HotwordService {
             'Vocal Assist écoute "Hey Vocal" en arrière-plan',
         channelImportance: NotificationChannelImportance.LOW,
         priority: NotificationPriority.LOW,
-        iconData: const NotificationIconData(
-          resType: ResourceType.mipmap,
-          resPrefix: ResourcePrefix.ic,
-          name: 'launcher',
-        ),
+      ),
+      iosNotificationOptions: const IOSNotificationOptions(
+        showNotification: true,
+        playSound: false,
       ),
       foregroundTaskOptions: const ForegroundTaskOptions(
         eventAction: ForegroundTaskEventAction.repeat(10000),
@@ -72,11 +71,10 @@ class HotwordService {
         );
       }
 
-      final grammar = _buildGrammar();
       _recognizer = await _vosk.createRecognizer(
         model: _model!,
         sampleRate: 16000,
-        grammar: grammar,
+        grammar: _buildGrammar(),
       );
 
       _speechService = await _vosk.initSpeechService(_recognizer!);
@@ -129,13 +127,13 @@ class HotwordService {
     }
   }
 
-  String _buildGrammar() {
+  /// Mots-clés passés à Vosk pour limiter le vocabulaire reconnu
+  List<String> _buildGrammar() {
     final words = <String>{};
     for (final hw in _hotwords) {
       words.addAll(hw.split(' '));
     }
-    final wordList = words.map((w) => '"$w"').join(', ');
-    return '[$wordList]';
+    return words.toList();
   }
 
   String _extractText(String json) {
