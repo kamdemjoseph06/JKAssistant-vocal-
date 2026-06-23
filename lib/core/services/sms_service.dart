@@ -11,18 +11,22 @@ class SmsService {
     required String message,
   }) async {
     try {
-      final granted = await Permission.sms.isGranted;
-      if (!granted) {
-        return SmsResult.failure('Permission SMS refusée');
+      // [FIX E019] Demander la permission SMS au runtime avant envoi
+      final status = await Permission.sms.request();
+      if (!status.isGranted) {
+        return SmsResult.failure('Permission SMS refusée. Activez-la dans les paramètres.');
       }
+
+      // [FIX E020] Convertir en format international avant envoi
+      final cleanNumber = _toInternational(phoneNumber);
 
       final result = await sendSMS(
         message: message,
-        recipients: [phoneNumber],
+        recipients: [cleanNumber],
       );
 
       debugPrint('📤 SMS status: $result');
-      debugPrint('✅ SMS envoyé à $contactName: "$message"');
+      debugPrint('✅ SMS envoyé à $contactName ($cleanNumber): "$message"');
       return SmsResult.success('SMS envoyé à $contactName');
     } catch (e) {
       debugPrint('❌ SmsService.sendSms error: $e');
@@ -58,6 +62,19 @@ class SmsService {
     }).join('. ');
 
     return intro + readings;
+  }
+
+  /// Convertir numéro local en format international
+  String _toInternational(String number) {
+    String clean = number.replaceAll(RegExp(r'[\s\-\.\(\)]'), '');
+    // France : 06... ou 07... → +336... ou +337...
+    if (clean.startsWith('0') && clean.length == 10) {
+      clean = '+33${clean.substring(1)}';
+    }
+    if (!clean.startsWith('+')) {
+      clean = '+$clean';
+    }
+    return clean;
   }
 }
 
