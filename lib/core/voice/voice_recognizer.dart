@@ -24,6 +24,11 @@ class VoiceRecognizer {
   VoiceLanguage _currentLanguage = VoiceLanguage.french;
   VoiceLanguage get currentLanguage => _currentLanguage;
 
+  // [FIX E033] Exposer les modèles chargés pour partage avec HotwordService
+  // Évite de charger le modèle deux fois → prévient les OOM
+  Model? get frModel => _frModel;
+  Model? get enModel => _enModel;
+
   final StreamController<String> _resultController =
       StreamController<String>.broadcast();
   Stream<String> get onResult => _resultController.stream;
@@ -36,8 +41,6 @@ class VoiceRecognizer {
   Future<void> initialize() async {
     _status = RecognizerStatus.loading;
     try {
-      // ⚠️ ERRORS_LOG: Les modèles doivent être dans assets/models/
-      // et déclarés dans pubspec.yaml flutter.assets
       _frModel = await _vosk.createModel(
           _modelPaths[VoiceLanguage.french]!);
       _enModel = await _vosk.createModel(
