@@ -88,6 +88,8 @@ class VoiceState extends Equatable {
     bool? carModeActive, bool? hotwordActive,
     String? pendingConfirmation, VoiceCommand? pendingCommand,
     double? lastConfidence,
+    bool clearPendingCommand = false,
+    bool clearPendingConfirmation = false,
   }) => VoiceState(
     status: status ?? this.status,
     displayText: displayText ?? this.displayText,
@@ -99,8 +101,8 @@ class VoiceState extends Equatable {
     contactsCount: contactsCount ?? this.contactsCount,
     carModeActive: carModeActive ?? this.carModeActive,
     hotwordActive: hotwordActive ?? this.hotwordActive,
-    pendingConfirmation: pendingConfirmation ?? this.pendingConfirmation,
-    pendingCommand: pendingCommand ?? this.pendingCommand,
+    pendingConfirmation: clearPendingConfirmation ? null : (pendingConfirmation ?? this.pendingConfirmation),
+    pendingCommand: clearPendingCommand ? null : (pendingCommand ?? this.pendingCommand),
     lastConfidence: lastConfidence ?? this.lastConfidence,
   );
 
@@ -197,7 +199,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     if (state.status == AssistantStatus.listening) return;
     await _synthesizer.speak('Oui ?');
     await _recognizer.startListening();
-    emit(state.copyWith(status: AssistantStatus.listening, displayText: '🎙️ Hey Vocal — J\'écoute...', partialText: ''));
+    emit(state.copyWith(status: AssistantStatus.listening, displayText: 'Hey Vocal — J\'écoute...', partialText: ''));
   }
 
   Future<void> _onStartListening(VoiceStartListening event, Emitter<VoiceState> emit) async {
@@ -215,15 +217,86 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     final command = _parser.parse(event.text);
     final lang = command.language;
 
+    // [FIX E038] Si confidence entre 0.3 et 0.5, demander confirmation vocale
+    // Si confidence < 0.3, commande trop incertaine → ignorer silencieusement avec feedback
+    if (command.confidence < 0.3 && command.action != CommandAction.unknown) {
+      final msg = lang == 'fr'
+          ? 'Je n\'ai pas bien compris. Veuillez répéter.'
+          : 'I didn\'t understand clearly. Please repeat.';
+      await _synthesizer.speak(msg);
+      emit(state.copyWith(
+        status: AssistantStatus.ready,
+        displayText: '❓ "${event.text}"',
+        lastConfidence: command.confidence,
+      ));
+      return;
+    }
+
+    // [FIX E038] Confidence entre 0.3 et 0.75 sur commandes sensibles → demander confirmation
+    if (command.confidence < 0.75 && command.confidence >= 0.3 &&
+        _requiresConfirmation(command.action)) {
+      final suggestion = _buildConfirmationText(command, lang);
+      final confirmMsg = lang == 'fr'
+          ? 'Vous voulez dire : $suggestion ?'
+          : 'Did you mean: $suggestion?';
+      await _synthesizer.speak(confirmMsg);
+      emit(state.copyWith(
+        status: AssistantStatus.ready,
+        displayText: confirmMsg,
+        pendingConfirmation: suggestion,
+        pendingCommand: command,
+        lastConfidence: command.confidence,
+      ));
+      return;
+    }
+
+    emit(state.copyWith(lastConfidence: command.confidence));
+    await _dispatchCommand(command, event.text, emit);
+  }
+
+  /// Indique si une action nécessite une confirmation (actions sensibles)
+  bool _requiresConfirmation(CommandAction action) {
+    return action == CommandAction.call ||
+        action == CommandAction.sendSms ||
+        action == CommandAction.whatsappMessage ||
+        action == CommandAction.whatsappCall;
+  }
+
+  /// Construire un texte de confirmation lisible
+  String _buildConfirmationText(VoiceCommand command, String lang) {
+    switch (command.action) {
+      case CommandAction.call:
+        return lang == 'fr'
+            ? 'appeler ${command.contactName ?? "?"}'
+            : 'call ${command.contactName ?? "?"}';
+      case CommandAction.sendSms:
+        return lang == 'fr'
+            ? 'envoyer un SMS à ${command.contactName ?? "?"}'
+            : 'send SMS to ${command.contactName ?? "?"}';
+      case CommandAction.whatsappMessage:
+        return lang == 'fr'
+            ? 'envoyer WhatsApp à ${command.contactName ?? "?"}'
+            : 'send WhatsApp to ${command.contactName ?? "?"}';
+      case CommandAction.whatsappCall:
+        return lang == 'fr'
+            ? 'appel WhatsApp ${command.contactName ?? "?"}'
+            : 'WhatsApp call ${command.contactName ?? "?"}';
+      default:
+        return command.rawText;
+    }
+  }
+
+  Future<void> _dispatchCommand(VoiceCommand command, String rawText, Emitter<VoiceState> emit) async {
+    final lang = command.language;
     switch (command.action) {
       case CommandAction.call:
         await _handleCall(command, emit);
       case CommandAction.answer:
         await _synthesizer.confirmAnswer(lang);
-        emit(state.copyWith(status: AssistantStatus.ready, displayText: '✅ Appel décroché'));
+        emit(state.copyWith(status: AssistantStatus.ready, displayText: 'Appel décroché'));
       case CommandAction.hangup:
         await _synthesizer.confirmHangup(lang);
-        emit(state.copyWith(status: AssistantStatus.ready, displayText: '📵 Appel terminé'));
+        emit(state.copyWith(status: AssistantStatus.ready, displayText: 'Appel terminé'));
       case CommandAction.whoCalling:
         await _synthesizer.speak(lang == 'fr' ? 'Consultation en cours' : 'Checking caller');
         emit(state.copyWith(status: AssistantStatus.ready));
@@ -243,7 +316,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
         await _alarmService.cancelAlarm();
         final msg = lang == 'fr' ? 'Réveil annulé' : 'Alarm cancelled';
         await _synthesizer.speak(msg);
-        emit(state.copyWith(status: AssistantStatus.ready, displayText: '❌ $msg'));
+        emit(state.copyWith(status: AssistantStatus.ready, displayText: 'Réveil annulé'));
       case CommandAction.carModeOn:
         add(VoiceCarModeToggled());
       case CommandAction.carModeOff:
@@ -251,7 +324,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       case CommandAction.unknown:
         final msg = lang == 'fr' ? 'Commande non reconnue' : 'Command not recognized';
         await _synthesizer.speak(msg);
-        emit(state.copyWith(status: AssistantStatus.ready, displayText: '❓ "${event.text}"'));
+        emit(state.copyWith(status: AssistantStatus.ready, displayText: '? "$rawText"'));
     }
   }
 
@@ -260,46 +333,79 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     final result = await _makeCallUseCase.execute(spokenName: command.contactName!, triggeredBy: 'VOICE');
     if (result.success) {
       await _synthesizer.confirmCall(result.data!, command.language);
-      emit(state.copyWith(status: AssistantStatus.ready, displayText: '📞 ${result.data}'));
+      emit(state.copyWith(status: AssistantStatus.ready, displayText: 'Appel: ${result.data}'));
     } else {
       await _synthesizer.contactNotFound(command.contactName!, command.language);
-      emit(state.copyWith(status: AssistantStatus.ready, displayText: '❌ ${result.errorMessage}'));
+      emit(state.copyWith(status: AssistantStatus.ready, displayText: 'Contact introuvable: ${command.contactName}'));
     }
   }
 
   Future<void> _handleSendSms(VoiceCommand command, Emitter<VoiceState> emit) async {
-    if (command.contactName == null || command.messageText == null) return;
+    // [FIX E037] Vérifier que le message n'est pas null avant d'envoyer
+    if (command.contactName == null) {
+      final msg = command.language == 'fr' ? 'À qui envoyer le SMS ?' : 'Who should I send the SMS to?';
+      await _synthesizer.speak(msg);
+      emit(state.copyWith(status: AssistantStatus.ready, displayText: msg));
+      return;
+    }
+    if (command.messageText == null) {
+      final msg = command.language == 'fr' ? 'Quel est le message ?' : 'What is the message?';
+      await _synthesizer.speak(msg);
+      emit(state.copyWith(status: AssistantStatus.ready, displayText: msg));
+      return;
+    }
     final contact = await _contactRepo.findContact(command.contactName!);
     if (contact == null) {
       await _synthesizer.contactNotFound(command.contactName!, command.language);
-      emit(state.copyWith(status: AssistantStatus.ready, displayText: '❌ Contact introuvable'));
+      emit(state.copyWith(status: AssistantStatus.ready, displayText: 'Contact introuvable'));
       return;
     }
-    final result = await _smsService.sendSms(phoneNumber: contact.phoneNumber, contactName: contact.displayName, message: command.messageText!);
-    final msg = result.success ? (command.language == 'fr' ? 'SMS envoyé à ${contact.displayName}' : 'SMS sent to ${contact.displayName}') : result.message;
+    final result = await _smsService.sendSms(
+      phoneNumber: contact.phoneNumber,
+      contactName: contact.displayName,
+      message: command.messageText!,
+    );
+    final msg = result.success
+        ? (command.language == 'fr' ? 'SMS envoyé à ${contact.displayName}' : 'SMS sent to ${contact.displayName}')
+        : result.message;
     await _synthesizer.speak(msg);
-    emit(state.copyWith(status: AssistantStatus.ready, displayText: result.success ? '📱 $msg' : '❌ $msg'));
+    emit(state.copyWith(status: AssistantStatus.ready, displayText: msg));
   }
 
   Future<void> _handleReadSms(VoiceCommand command, Emitter<VoiceState> emit) async {
     final messages = await _smsService.getRecentSms(limit: 3);
     final speech = _smsService.formatSmsForSpeech(messages, command.language);
     await _synthesizer.speak(speech);
-    emit(state.copyWith(status: AssistantStatus.ready, displayText: '📩 ${messages.length} messages'));
+    emit(state.copyWith(status: AssistantStatus.ready, displayText: '${messages.length} messages'));
   }
 
   Future<void> _handleWhatsappMessage(VoiceCommand command, Emitter<VoiceState> emit) async {
-    if (command.contactName == null || command.messageText == null) return;
+    if (command.contactName == null) {
+      final msg = command.language == 'fr' ? 'À qui envoyer le WhatsApp ?' : 'Who should I WhatsApp?';
+      await _synthesizer.speak(msg);
+      emit(state.copyWith(status: AssistantStatus.ready, displayText: msg));
+      return;
+    }
+    if (command.messageText == null) {
+      final msg = command.language == 'fr' ? 'Quel est le message ?' : 'What is the message?';
+      await _synthesizer.speak(msg);
+      emit(state.copyWith(status: AssistantStatus.ready, displayText: msg));
+      return;
+    }
     final contact = await _contactRepo.findContact(command.contactName!);
     if (contact == null) {
       await _synthesizer.contactNotFound(command.contactName!, command.language);
-      emit(state.copyWith(status: AssistantStatus.ready, displayText: '❌ Contact introuvable'));
+      emit(state.copyWith(status: AssistantStatus.ready, displayText: 'Contact introuvable'));
       return;
     }
-    final result = await _whatsappService.sendMessage(phoneNumber: contact.phoneNumber, contactName: contact.displayName, message: command.messageText!);
+    final result = await _whatsappService.sendMessage(
+      phoneNumber: contact.phoneNumber,
+      contactName: contact.displayName,
+      message: command.messageText!,
+    );
     final msg = result.success ? 'WhatsApp → ${contact.displayName}' : result.message;
     await _synthesizer.speak(msg);
-    emit(state.copyWith(status: AssistantStatus.ready, displayText: result.success ? '💬 $msg' : '❌ $msg'));
+    emit(state.copyWith(status: AssistantStatus.ready, displayText: msg));
   }
 
   Future<void> _handleWhatsappCall(VoiceCommand command, Emitter<VoiceState> emit) async {
@@ -310,36 +416,51 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       emit(state.copyWith(status: AssistantStatus.ready));
       return;
     }
-    await _whatsappService.makeCall(phoneNumber: contact.phoneNumber, contactName: contact.displayName);
-    final msg = command.language == 'fr' ? 'Appel WhatsApp ${contact.displayName}' : 'WhatsApp call ${contact.displayName}';
+    await _whatsappService.makeCall(
+      phoneNumber: contact.phoneNumber,
+      contactName: contact.displayName,
+    );
+    final msg = command.language == 'fr'
+        ? 'Appel WhatsApp ${contact.displayName}'
+        : 'WhatsApp call ${contact.displayName}';
     await _synthesizer.speak(msg);
-    emit(state.copyWith(status: AssistantStatus.ready, displayText: '📞 $msg'));
+    emit(state.copyWith(status: AssistantStatus.ready, displayText: msg));
   }
 
   Future<void> _handleSetAlarm(VoiceCommand command, Emitter<VoiceState> emit) async {
     if (command.timeText == null) return;
     final result = await _alarmService.setAlarm(command.timeText!, command.language);
     await _synthesizer.speak(result.message);
-    emit(state.copyWith(status: AssistantStatus.ready, displayText: result.success ? '⏰ ${result.message}' : '❌ ${result.message}'));
+    emit(state.copyWith(
+      status: AssistantStatus.ready,
+      displayText: result.message,
+    ));
   }
 
   Future<void> _handleSetTimer(VoiceCommand command, Emitter<VoiceState> emit) async {
     if (command.timeText == null) return;
     final result = await _alarmService.setTimer(command.timeText!, command.language);
     await _synthesizer.speak(result.message);
-    emit(state.copyWith(status: AssistantStatus.ready, displayText: result.success ? '⏱️ ${result.message}' : '❌ ${result.message}'));
+    emit(state.copyWith(
+      status: AssistantStatus.ready,
+      displayText: result.message,
+    ));
   }
 
   Future<void> _onCarModeToggled(VoiceCarModeToggled event, Emitter<VoiceState> emit) async {
     if (state.carModeActive) {
       final result = await _carModeService.deactivate();
       await _synthesizer.speak(result.message);
-      emit(state.copyWith(carModeActive: false, displayText: '🚗 Mode voiture désactivé'));
+      emit(state.copyWith(carModeActive: false, displayText: 'Mode voiture désactivé'));
     } else {
       final result = await _carModeService.activate();
       await _synthesizer.speak(result.message);
       await _recognizer.startListening();
-      emit(state.copyWith(carModeActive: true, status: AssistantStatus.listening, displayText: '🚗 Mode voiture actif'));
+      emit(state.copyWith(
+        carModeActive: true,
+        status: AssistantStatus.listening,
+        displayText: 'Mode voiture actif',
+      ));
     }
   }
 
@@ -348,45 +469,30 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       await _hotwordService.stopListening();
       emit(state.copyWith(hotwordActive: false, displayText: 'Écoute permanente désactivée'));
     } else {
-      await _hotwordService.startListening();
-      emit(state.copyWith(hotwordActive: true, displayText: '👂 Dites "Hey Vocal"'));
+      // [FIX E033] Passer le modèle partagé pour éviter double chargement mémoire
+      await _hotwordService.startListening(sharedModel: _recognizer.frModel);
+      emit(state.copyWith(hotwordActive: true, displayText: 'Dites "Hey Vocal"'));
     }
   }
 
   Future<void> _onConfirmed(VoiceConfirmed event, Emitter<VoiceState> emit) async {
     if (state.pendingCommand != null) {
-      await _executeCommand(state.pendingCommand!, emit);
+      await _dispatchCommand(state.pendingCommand!, state.pendingCommand!.rawText, emit);
     }
-    emit(state.copyWith(pendingConfirmation: null));
-  }
-
-  Future<void> _onDenied(VoiceDenied event, Emitter<VoiceState> emit) async {
-    await _synthesizer.speak("D accord, je recommence");
     emit(state.copyWith(
-      pendingConfirmation: null,
-      pendingCommand: null,
-      status: AssistantStatus.ready,
-      displayText: "J ecoute de nouveau...",
+      clearPendingConfirmation: true,
+      clearPendingCommand: true,
     ));
   }
 
-  Future<void> _executeCommand(VoiceCommand command, Emitter<VoiceState> emit) async {
-    switch (command.action) {
-      case CommandAction.call:
-        await _handleCall(command, emit);
-      case CommandAction.sendSms:
-        await _handleSendSms(command, emit);
-      case CommandAction.whatsappMessage:
-        await _handleWhatsappMessage(command, emit);
-      case CommandAction.whatsappCall:
-        await _handleWhatsappCall(command, emit);
-      case CommandAction.setAlarm:
-        await _handleSetAlarm(command, emit);
-      case CommandAction.setTimer:
-        await _handleSetTimer(command, emit);
-      default:
-        break;
-    }
+  Future<void> _onDenied(VoiceDenied event, Emitter<VoiceState> emit) async {
+    await _synthesizer.speak("D'accord, je recommence");
+    emit(state.copyWith(
+      clearPendingConfirmation: true,
+      clearPendingCommand: true,
+      status: AssistantStatus.ready,
+      displayText: "J'écoute de nouveau...",
+    ));
   }
 
   void _onPartialReceived(VoicePartialReceived event, Emitter<VoiceState> emit) {
@@ -395,7 +501,10 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
 
   Future<void> _onLanguageChanged(VoiceLanguageChanged event, Emitter<VoiceState> emit) async {
     await _recognizer.setLanguage(event.language);
-    emit(state.copyWith(language: event.language, displayText: event.language == VoiceLanguage.french ? 'Langue: Français' : 'Language: English'));
+    emit(state.copyWith(
+      language: event.language,
+      displayText: event.language == VoiceLanguage.french ? 'Langue: Français' : 'Language: English',
+    ));
   }
 
   Future<void> _onContactsSynced(VoiceContactsSynced event, Emitter<VoiceState> emit) async {
@@ -403,6 +512,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     emit(state.copyWith(contactsCount: result.data ?? 0, contactsSynced: result.success));
   }
 
+  // [FIX E017] Toujours annuler les StreamSubscriptions dans close()
   @override
   Future<void> close() {
     _resultSub?.cancel();
