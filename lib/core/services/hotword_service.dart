@@ -13,7 +13,9 @@ class HotwordService {
   ];
 
   final VoskFlutterPlugin _vosk = VoskFlutterPlugin.instance();
+  // [FIX E033] Le modèle est passé depuis VoiceRecognizer — pas rechargé ici
   Model? _model;
+  bool _ownsModel = false; // true seulement si on a chargé le modèle nous-mêmes
   Recognizer? _recognizer;
   SpeechService? _speechService;
 
@@ -23,6 +25,7 @@ class HotwordService {
   Stream<void> get onWakeWord => _wakeWordController.stream;
 
   DateTime? _lastTrigger;
+  // [FIX E032] Cooldown 3s minimum — ne pas réduire
   static const _cooldown = Duration(seconds: 3);
 
   static Future<void> initForegroundTask() async {
@@ -41,6 +44,7 @@ class HotwordService {
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
         eventAction: ForegroundTaskEventAction.repeat(10000),
+        // [FIX E028] autoRunOnBoot = true + permission RECEIVE_BOOT_COMPLETED dans AndroidManifest
         autoRunOnBoot: true,
         allowWakeLock: true,
         allowWifiLock: false,
@@ -48,6 +52,8 @@ class HotwordService {
     );
   }
 
+  /// Démarrer l'écoute hotword.
+  /// [FIX E033] Passer sharedModel depuis VoiceRecognizer pour éviter double chargement.
   Future<void> startListening({Model? sharedModel}) async {
     if (_isRunning) return;
 
@@ -59,14 +65,21 @@ class HotwordService {
         callback: _hotwordTaskCallback,
       );
 
-      _model = sharedModel;
-      if (_model == null) {
-        debugPrint('📥 HotwordService: chargement modèle Vosk...');
+      if (sharedModel != null) {
+        // Utiliser le modèle partagé — pas de rechargement
+        _model = sharedModel;
+        _ownsModel = false;
+        debugPrint('✅ HotwordService: utilise modèle partagé VoiceRecognizer');
+      } else {
+        // Fallback : charger le modèle si aucun partagé
+        debugPrint('📥 HotwordService: chargement modèle Vosk (fallback)...');
         _model = await _vosk.createModel(
           'assets/models/vosk-model-small-fr-0.22',
         );
+        _ownsModel = true;
       }
 
+      // [FIX E031] Grammaire restreinte pour minimiser les faux positifs
       _recognizer = await _vosk.createRecognizer(
         model: _model!,
         sampleRate: 16000,
@@ -93,6 +106,12 @@ class HotwordService {
     _speechService = null;
     _recognizer?.dispose();
     _recognizer = null;
+    // [FIX E033] Ne disposer le modèle que si on en est propriétaire
+    if (_ownsModel) {
+      _model?.dispose();
+    }
+    _model = null;
+    _ownsModel = false;
     await FlutterForegroundTask.stopService();
     _isRunning = false;
     debugPrint('⏹️ HotwordService: écoute arrêtée');
@@ -102,6 +121,7 @@ class HotwordService {
     final text = _extractText(json).toLowerCase().trim();
     if (text.isEmpty) return;
     final now = DateTime.now();
+    // [FIX E032] Cooldown pour éviter double déclenchement
     if (_lastTrigger != null && now.difference(_lastTrigger!) < _cooldown) return;
     for (final hotword in _hotwords) {
       if (text.contains(hotword)) {
