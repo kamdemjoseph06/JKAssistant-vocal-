@@ -587,18 +587,30 @@ class IntentRecognizer {
     // Supprimer le verbe du texte
     String remaining = text.replaceFirst(matchedVerb, '').trim();
 
-    // Supprimer les mots de liaison FR/EN
-    final linking = ['a', 'à', 'le', 'la', 'les', 'au', 'aux', 'de',
-                     'du', 'un', 'une', 'pour', 'to', 'the', 'a', 'an', 'for'];
+    // [FIX E035] Mots de liaison FR/EN étendus pour éviter "mon", "ma", "ami" comme contact
+    final linking = [
+      // Articles et prépositions FR
+      'a', 'à', 'le', 'la', 'les', 'au', 'aux', 'de', 'du', 'un', 'une', 'pour',
+      // Pronoms possessifs FR — AJOUTÉS pour corriger E035
+      'mon', 'ma', 'mes', 'ton', 'ta', 'tes', 'son', 'sa', 'ses',
+      'notre', 'votre', 'leur', 'leurs',
+      // Mots relationnels FR — AJOUTÉS pour corriger E035
+      'ami', 'amie', 'amis', 'frere', 'soeur', 'pere', 'mere', 'fils',
+      'fille', 'copain', 'copine', 'collegue', 'patron', 'chef',
+      'voisin', 'voisine', 'cousin', 'cousine', 'oncle', 'tante',
+      // Articles EN
+      'to', 'the', 'an', 'for', 'my', 'your', 'his', 'her', 'our',
+      // Mots relationnels EN
+      'friend', 'brother', 'sister', 'dad', 'mom', 'father', 'mother',
+      'boss', 'colleague', 'neighbor', 'cousin',
+    ];
     final words = remaining.split(' ');
     final filtered = <String>[];
 
-    bool skipNext = false;
     for (final word in words) {
-      if (skipNext) { skipNext = false; continue; }
       if (linking.contains(word) && filtered.isEmpty) continue;
-      // Arrêter si on rencontre "et dis", "pour dire", "en disant"...
-      if (['et', 'pour', 'en', 'que', 'qu', 'and', 'to', 'saying'].contains(word)) break;
+      // Arrêter si on rencontre des mots de coupure
+      if (['et', 'pour', 'en', 'que', 'qu', 'and', 'saying', 'ce', 'cet', 'cette'].contains(word)) break;
       if (word.isNotEmpty) filtered.add(word);
     }
 
