@@ -8,6 +8,7 @@ class VoiceSynthesizer {
   Future<void> initialize() async {
     try {
       await _tts.setSharedInstance(true);
+      // [FIX E013] awaitSpeakCompletion DOIT être true pour éviter superposition
       await _tts.awaitSpeakCompletion(true);
       await _tts.setSpeechRate(0.45);
       await _tts.setVolume(1.0);
@@ -22,8 +23,26 @@ class VoiceSynthesizer {
     }
   }
 
+  // [FIX E014] Fallback langue si fr-FR non installé sur l'appareil
   Future<void> setLanguage(String languageCode) async {
-    await _tts.setLanguage(languageCode);
+    try {
+      final available = await _tts.isLanguageAvailable(languageCode);
+      if (available == true) {
+        await _tts.setLanguage(languageCode);
+      } else {
+        // Tenter le code court (ex: 'fr' au lieu de 'fr-FR')
+        final shortCode = languageCode.split('-').first;
+        final shortAvailable = await _tts.isLanguageAvailable(shortCode);
+        if (shortAvailable == true) {
+          await _tts.setLanguage(shortCode);
+          debugPrint('⚠️ Langue $languageCode indisponible, fallback sur $shortCode');
+        } else {
+          debugPrint('⚠️ Langue $languageCode et $shortCode indisponibles, langue système conservée');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ setLanguage error pour $languageCode: $e');
+    }
   }
 
   Future<void> speak(String text) async {
