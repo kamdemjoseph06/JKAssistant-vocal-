@@ -11,16 +11,15 @@ class WhatsAppService {
     required String message,
   }) async {
     try {
-      // ⚠️ ERRORS_LOG: Numéro doit être au format international
-      // sans espaces ni tirets : +33612345678
-      final cleanNumber = _toInternational(phoneNumber);
+      // [FIX E022] wa.me requiert le numéro SANS + mais en format international
+      final cleanNumber = _toInternationalNoPlus(phoneNumber);
 
-      // URL scheme WhatsApp officielle
       final encodedMsg = Uri.encodeComponent(message);
       final uri = Uri.parse(
         'https://wa.me/$cleanNumber?text=$encodedMsg',
       );
 
+      // [FIX E021] Toujours vérifier canLaunchUrl avant launchUrl
       if (!await canLaunchUrl(uri)) {
         return WhatsAppResult.failure(
           'WhatsApp non installé sur cet appareil',
@@ -43,13 +42,12 @@ class WhatsAppService {
     required String contactName,
   }) async {
     try {
-      final cleanNumber = _toInternational(phoneNumber);
+      // [FIX E022] wa.me requiert numéro sans +
+      final cleanNumber = _toInternationalNoPlus(phoneNumber);
 
-      // URL scheme pour appel WhatsApp direct
-      // ⚠️ ERRORS_LOG: whatsapp://call ne fonctionne pas sur tous les appareils
-      // Utiliser l'API WhatsApp Business ou ouvrir le chat comme fallback
       final uri = Uri.parse('https://wa.me/$cleanNumber');
 
+      // [FIX E021] Toujours vérifier canLaunchUrl
       if (!await canLaunchUrl(uri)) {
         return WhatsAppResult.failure('WhatsApp non installé');
       }
@@ -63,19 +61,18 @@ class WhatsAppService {
     }
   }
 
-  /// Convertir numéro local en international
-  String _toInternational(String number) {
-    // Nettoyer
-    String clean = number.replaceAll(RegExp(r'[\s\-\.\(\)]'), '');
+  /// Convertir numéro local en international SANS le signe +
+  /// wa.me requiert : 33612345678 (pas +33612345678)
+  String _toInternationalNoPlus(String number) {
+    // Nettoyer tous les séparateurs
+    String clean = number.replaceAll(RegExp(r'[\s\-\.\(\)\+]'), '');
 
-    // France : 06... → +336...
+    // France : 06... ou 07... → 336... ou 337...
     if (clean.startsWith('0') && clean.length == 10) {
-      clean = '+33${clean.substring(1)}';
+      clean = '33${clean.substring(1)}';
     }
-    // Déjà international
-    if (!clean.startsWith('+')) {
-      clean = '+$clean';
-    }
+    // Si déjà en format international avec indicatif (ex: 33612...)
+    // ne pas ajouter de préfixe
     return clean;
   }
 }
