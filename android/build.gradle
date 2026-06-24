@@ -13,13 +13,19 @@ subprojects {
     project.evaluationDependsOn(':app')
 }
 
-// Fix: inject missing namespace for legacy plugins (required by AGP 8+)
-// gradle.afterProject runs AFTER each sub-project is fully evaluated — safe to use here
+// Fix: runs after each sub-project is evaluated — safe hook for AGP 8+ patches
 gradle.afterProject { proj ->
     if (proj.plugins.hasPlugin("com.android.library")) {
         try {
+            // Fix 1: inject missing namespace (required by AGP 8+)
             if (proj.android.namespace == null) {
                 proj.android.namespace = proj.group ?: proj.name
+            }
+        } catch (Exception ignored) {}
+        try {
+            // Fix 2: force compileSdk >= 34 to avoid missing SDK 33 on CI
+            if (proj.android.compileSdkVersion != null && proj.android.compileSdkVersion < 34) {
+                proj.android.compileSdkVersion 34
             }
         } catch (Exception ignored) {}
     }
