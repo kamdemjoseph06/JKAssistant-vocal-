@@ -13,6 +13,18 @@ subprojects {
     project.evaluationDependsOn(':app')
 }
 
+// Fix: inject missing namespace for legacy plugins (required by AGP 8+)
+// gradle.afterProject runs AFTER each sub-project is fully evaluated — safe to use here
+gradle.afterProject { proj ->
+    if (proj.plugins.hasPlugin("com.android.library")) {
+        try {
+            if (proj.android.namespace == null) {
+                proj.android.namespace = proj.group ?: proj.name
+            }
+        } catch (Exception ignored) {}
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
