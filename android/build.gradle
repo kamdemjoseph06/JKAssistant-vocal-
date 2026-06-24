@@ -13,19 +13,6 @@ subprojects {
     project.evaluationDependsOn(':app')
 }
 
-// Fix: inject namespace for legacy plugins that do not declare one (required by AGP 8+)
-subprojects {
-    afterEvaluate { project ->
-        if (project.plugins.hasPlugin("com.android.library")) {
-            try {
-                if (project.android.namespace == null) {
-                    project.android.namespace = project.group ?: project.name
-                }
-            } catch (ignored) {}
-        }
-    }
-}
-
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
