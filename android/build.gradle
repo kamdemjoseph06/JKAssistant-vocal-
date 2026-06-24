@@ -1,19 +1,31 @@
 allprojects {
-      repositories {
-          google()
-          mavenCentral()
-      }
-  }
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
 
-  rootProject.buildDir = '../build'
-  subprojects {
-      project.buildDir = "${rootProject.buildDir}/${project.name}"
-  }
-  subprojects {
-      project.evaluationDependsOn(':app')
-  }
+rootProject.buildDir = '../build'
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(':app')
+}
 
-  tasks.register("clean", Delete) {
-      delete rootProject.buildDir
-  }
-  
+// Fix: inject namespace for legacy plugins that do not declare one (required by AGP 8+)
+subprojects {
+    afterEvaluate { project ->
+        if (project.plugins.hasPlugin("com.android.library")) {
+            try {
+                if (project.android.namespace == null) {
+                    project.android.namespace = project.group ?: project.name
+                }
+            } catch (ignored) {}
+        }
+    }
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
