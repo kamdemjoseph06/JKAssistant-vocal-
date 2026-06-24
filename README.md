@@ -130,3 +130,5 @@ flutter test
 # Build APK release
 flutter build apk --release
 ```
+
+<!-- build trigger -->
