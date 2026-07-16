@@ -1,45 +1,78 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../database/app_database.dart';
 
 class CallRepository {
   final AppDatabase _db;
 
+  // Canal natif pour ACTION_CALL (appel direct, sans ouvrir le composeur)
+  static const _callChannel = MethodChannel('com.jkassistant.vocal/call');
+
   CallRepository(this._db);
 
-  /// Lancer un appel vers un numéro
+  /// Lancer un appel vocal direct.
+  ///
+  /// Stratégie :
+  ///   1. MethodChannel → Intent.ACTION_CALL (appel immédiat avec CALL_PHONE)
+  ///   2. Fallback       → url_launcher "tel:" (ouvre le composeur si le canal échoue)
   Future<bool> makeCall({
     required String phoneNumber,
     required String contactName,
     required String triggeredBy,
   }) async {
-    try {
-      final uri = Uri.parse('tel:$phoneNumber');
+    bool called = false;
 
-      if (!await canLaunchUrl(uri)) {
-        debugPrint('❌ Impossible de lancer tel: sur cet appareil');
+    // ── Tentative 1 : appel direct via MethodChannel (pas de bouton à presser) ──
+    try {
+      called = await _callChannel.invokeMethod<bool>('makeCall', phoneNumber) ?? false;
+      if (called) {
+        debugPrint('📞 Appel direct (ACTION_CALL): $contactName ($phoneNumber)');
+      }
+    } on PlatformException catch (e) {
+      debugPrint('⚠️ MethodChannel makeCall échoué (${e.code}): ${e.message}');
+      called = false;
+    } catch (e) {
+      debugPrint('⚠️ MethodChannel makeCall erreur inattendue: $e');
+      called = false;
+    }
+
+    // ── Fallback : url_launcher tel: (ouvre le composeur) ──────────────────────
+    if (!called) {
+      try {
+        final uri = Uri.parse('tel:$phoneNumber');
+        if (!await canLaunchUrl(uri)) {
+          debugPrint('❌ Impossible de lancer tel: sur cet appareil');
+          return false;
+        }
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        called = true;
+        debugPrint('📞 Appel via url_launcher (fallback): $contactName ($phoneNumber)');
+      } catch (e) {
+        debugPrint('❌ CallRepository.makeCall url_launcher error: $e');
         return false;
       }
-
-      await launchUrl(uri);
-
-      await _db.callHistoryDao.insertCall(
-        CallHistoryTableCompanion.insert(
-          contactName: contactName,
-          phoneNumber: phoneNumber,
-          callType: 'OUTGOING',
-          triggeredBy: triggeredBy,
-          calledAt: DateTime.now(),
-        ),
-      );
-
-      debugPrint('📞 Appel lancé: $contactName ($phoneNumber)');
-      return true;
-    } catch (e) {
-      debugPrint('❌ CallRepository.makeCall error: $e');
-      return false;
     }
+
+    // ── Enregistrer dans l'historique ──────────────────────────────────────────
+    if (called) {
+      try {
+        await _db.callHistoryDao.insertCall(
+          CallHistoryTableCompanion.insert(
+            contactName: contactName,
+            phoneNumber: phoneNumber,
+            callType: 'OUTGOING',
+            triggeredBy: triggeredBy,
+            calledAt: DateTime.now(),
+          ),
+        );
+      } catch (e) {
+        debugPrint('⚠️ Erreur enregistrement historique appel: $e');
+      }
+    }
+
+    return called;
   }
 
   Future<List<CallHistoryTableData>> getHistory({int limit = 50}) =>
