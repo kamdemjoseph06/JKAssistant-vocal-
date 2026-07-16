@@ -587,35 +587,52 @@ class IntentRecognizer {
     // Supprimer le verbe du texte
     String remaining = text.replaceFirst(matchedVerb, '').trim();
 
-    // [FIX E035] Mots de liaison FR/EN étendus pour éviter "mon", "ma", "ami" comme contact
+    // Articles et possessifs à ignorer en tête (pas les mots relationnels)
     final linking = [
-      // Articles et prépositions FR
       'a', 'à', 'le', 'la', 'les', 'au', 'aux', 'de', 'du', 'un', 'une', 'pour',
-      // Pronoms possessifs FR — AJOUTÉS pour corriger E035
       'mon', 'ma', 'mes', 'ton', 'ta', 'tes', 'son', 'sa', 'ses',
       'notre', 'votre', 'leur', 'leurs',
-      // Mots relationnels FR — AJOUTÉS pour corriger E035
+      'to', 'the', 'an', 'for', 'my', 'your', 'his', 'her', 'our',
+    ];
+    // Mots relationnels : on les conserve en fallback si rien d'autre n'est trouvé.
+    // Ex: "appelle ma mère" → "mere" utilisé pour la recherche (trouvera "Mère" en DB)
+    final relational = [
       'ami', 'amie', 'amis', 'frere', 'soeur', 'pere', 'mere', 'fils',
       'fille', 'copain', 'copine', 'collegue', 'patron', 'chef',
-      'voisin', 'voisine', 'cousin', 'cousine', 'oncle', 'tante',
-      // Articles EN
-      'to', 'the', 'an', 'for', 'my', 'your', 'his', 'her', 'our',
-      // Mots relationnels EN
+      'voisin', 'voisine', 'cousin', 'cousine', 'oncle', 'tante', 'maman', 'papa',
       'friend', 'brother', 'sister', 'dad', 'mom', 'father', 'mother',
       'boss', 'colleague', 'neighbor', 'cousin',
     ];
+
     final words = remaining.split(' ');
     final filtered = <String>[];
+    final relationalFallback = <String>[];
 
     for (final word in words) {
-      if (linking.contains(word) && filtered.isEmpty) continue;
-      // Arrêter si on rencontre des mots de coupure
-      if (['et', 'pour', 'en', 'que', 'qu', 'and', 'saying', 'ce', 'cet', 'cette'].contains(word)) break;
-      if (word.isNotEmpty) filtered.add(word);
+      if (word.isEmpty) continue;
+      // Mots de fin de phrase : on s'arrête
+      if (['et', 'en', 'que', 'qu', 'and', 'saying', 'ce', 'cet', 'cette',
+           's il', 'sil', 'te', 'plait', 'maintenant', 'vite', 'urgent',
+           'merci', 'please', 'now'].contains(word)) break;
+      // Ignorer les articles/possessifs en tête seulement
+      if (linking.contains(word) && filtered.isEmpty && relationalFallback.isEmpty) continue;
+      // Mot relationnel : garder en fallback si c'est le seul contenu
+      if (relational.contains(word) && filtered.isEmpty) {
+        relationalFallback.add(word);
+        continue;
+      }
+      filtered.add(word);
     }
 
-    final contact = filtered.take(2).join(' ').trim();
-    return contact.isEmpty ? null : contact;
+    // Utiliser les vrais mots s'il y en a, sinon le mot relationnel comme terme de recherche
+    if (filtered.isNotEmpty) {
+      return filtered.take(2).join(' ').trim();
+    }
+    if (relationalFallback.isNotEmpty) {
+      // [FIX] Était null avant → "appelle ma mère" échouait silencieusement
+      return relationalFallback.first;
+    }
+    return null;
   }
 
   /// Extraire contact ET message pour SMS/WhatsApp
@@ -624,28 +641,48 @@ class IntentRecognizer {
 
     // Supprimer les préfixes : "à Jean dis lui que" → "Jean", "je suis en route"
     remaining = remaining
-        .replaceFirst(RegExp(r'^(a|à|au|le|la|un|une|to|the)\s+'), '')
+        .replaceFirst(RegExp(r'^(a|à|au|le|la|un|une|mon|ma|to|the|my)\s+'), '')
         .trim();
 
     // Séparer contact et message sur les mots de coupure
     final separators = RegExp(
       r'\s+(que|qu|pour dire|pour lui dire|dis lui|dis-lui|dis lui que'
-      r'|en lui disant|le message|le texte|ceci|cela'
+      r'|en lui disant|le message|le texte|ceci|cela|disant|en disant'
       r'|that|saying|to say|the message)\s+',
       caseSensitive: false,
     );
 
     final parts = remaining.split(separators);
     if (parts.length >= 2) {
-      final contact = parts[0].split(' ').first.trim();
+      // [FIX] Était: parts[0].split(' ').first → un seul mot, "Jean Pierre" → "jean"
+      // Maintenant : jusqu'à 2 mots pour les prénoms composés
+      final contactWords = parts[0].trim().split(' ')
+          .where((w) => w.isNotEmpty)
+          .take(2)
+          .toList();
+      final contact = contactWords.join(' ').trim();
       final message = parts.sublist(1).join(' ').trim();
       return (contact.isEmpty ? null : contact, message.isEmpty ? null : message);
     }
 
-    // Fallback: premier mot = contact, reste = message
-    final words = remaining.split(' ');
-    if (words.length >= 2) {
+    // Fallback: premier(s) mot(s) = contact, reste = message
+    final words = remaining.split(' ').where((w) => w.isNotEmpty).toList();
+    if (words.length >= 3) {
+      // Essayer 2 mots pour le contact si le 2ème ressemble à un prénom (commence par majuscule)
+      final secondWordIsName = words.length > 1 &&
+          words[1].isNotEmpty &&
+          words[1][0] == words[1][0].toUpperCase() &&
+          !['de', 'du', 'que', 'en', 'le', 'la'].contains(words[1].toLowerCase());
+      if (secondWordIsName && words.length >= 3) {
+        return (
+          '${words[0]} ${words[1]}',
+          words.sublist(2).join(' '),
+        );
+      }
       return (words.first, words.sublist(1).join(' '));
+    }
+    if (words.length == 2) {
+      return (words.first, words.last);
     }
 
     return (remaining.isEmpty ? null : remaining, null);

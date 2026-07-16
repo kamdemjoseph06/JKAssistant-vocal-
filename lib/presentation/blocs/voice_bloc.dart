@@ -213,6 +213,28 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   }
 
   Future<void> _onTextReceived(VoiceTextReceived event, Emitter<VoiceState> emit) async {
+    // [FIX] Confirmation vocale — si une commande est en attente, "oui" / "non" vocal l'exécute
+    // sans passer par le NLU (avant ça, "oui" était parsé comme commande inconnue et ignoré).
+    if (state.pendingCommand != null) {
+      final lower = event.text.toLowerCase().trim();
+      const confirmWords = [
+        'oui', 'ouais', 'yes', 'confirme', 'ok', 'bien sur', 'biensur',
+        'vas y', 'vasy', 'parfait', 'affirmatif', 'd accord', 'daccord', 'go',
+      ];
+      const denyWords = [
+        'non', 'no', 'annule', 'cancel', 'recommence', 'stop',
+        'pas', 'rien', 'jamais', 'laisse tomber',
+      ];
+      if (confirmWords.any((w) => lower == w || lower.startsWith('$w ') || lower.endsWith(' $w'))) {
+        add(VoiceConfirmed());
+        return;
+      }
+      if (denyWords.any((w) => lower == w || lower.startsWith('$w ') || lower.endsWith(' $w'))) {
+        add(VoiceDenied());
+        return;
+      }
+    }
+
     emit(state.copyWith(status: AssistantStatus.processing, displayText: event.text, partialText: ''));
     final command = _parser.parse(event.text);
     final lang = command.language;
@@ -329,7 +351,15 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   }
 
   Future<void> _handleCall(VoiceCommand command, Emitter<VoiceState> emit) async {
-    if (command.contactName == null) return;
+    if (command.contactName == null) {
+      // [FIX] Retour vocal quand le nom du contact n'a pas été extrait (était silencieux)
+      final msg = command.language == 'fr'
+          ? 'Qui voulez-vous appeler ?'
+          : 'Who would you like to call?';
+      await _synthesizer.speak(msg);
+      emit(state.copyWith(status: AssistantStatus.ready, displayText: msg));
+      return;
+    }
     final result = await _makeCallUseCase.execute(spokenName: command.contactName!, triggeredBy: 'VOICE');
     if (result.success) {
       await _synthesizer.confirmCall(result.data!, command.language);
@@ -409,7 +439,15 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   }
 
   Future<void> _handleWhatsappCall(VoiceCommand command, Emitter<VoiceState> emit) async {
-    if (command.contactName == null) return;
+    if (command.contactName == null) {
+      // [FIX] Retour vocal quand le nom du contact n'a pas été extrait
+      final msg = command.language == 'fr'
+          ? 'Qui voulez-vous appeler sur WhatsApp ?'
+          : 'Who would you like to call on WhatsApp?';
+      await _synthesizer.speak(msg);
+      emit(state.copyWith(status: AssistantStatus.ready, displayText: msg));
+      return;
+    }
     final contact = await _contactRepo.findContact(command.contactName!);
     if (contact == null) {
       await _synthesizer.contactNotFound(command.contactName!, command.language);

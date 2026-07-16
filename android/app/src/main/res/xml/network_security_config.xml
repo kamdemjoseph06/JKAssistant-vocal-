@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Configuration de sécurité réseau.
+    - Interdit le trafic HTTP en clair (cleartext) en production
+    - Autorise uniquement HTTPS
+    - Améliore la reconnaissance par Google Play Protect
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>

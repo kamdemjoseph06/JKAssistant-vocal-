@@ -79,11 +79,26 @@
     ══════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
 
+    <!-- Android 11+ : déclarer les apps qu'on interroge via canLaunchUrl -->
+    <queries>
+        <package android:name="com.whatsapp"/>
+        <package android:name="com.whatsapp.w4b"/>
+        <intent>
+            <action android:name="android.intent.action.CALL"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO"/>
+            <data android:scheme="sms"/>
+        </intent>
+    </queries>
+
     <application
         android:label="VocalAssist"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="false"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:installLocation="internalOnly">
 
         <activity
             android:name=".MainActivity"

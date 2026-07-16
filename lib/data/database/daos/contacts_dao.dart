@@ -18,13 +18,59 @@ class ContactsDao extends DatabaseAccessor<AppDatabase>
   }
 
   /// Chercher correspondance exacte ou la plus proche
+  /// [FIX] Recherche multi-étapes : exacte → partielle → mot par mot → longueur
   Future<ContactsCacheTableData?> findBestMatch(String spokenName) async {
     final normalized = _normalize(spokenName);
-    final results = await searchByName(normalized);
+
+    // 1. Correspondance directe (contient le nom normalisé complet)
+    var results = await searchByName(normalized);
+
+    // 2. Si pas de résultat, chercher mot par mot (contacts composés)
+    if (results.isEmpty) {
+      final words = normalized.split(' ').where((w) => w.length > 2).toList();
+      for (final word in words) {
+        final partial = await searchByName(word);
+        for (final r in partial) {
+          if (!results.any((e) => e.contactId == r.contactId)) {
+            results.add(r);
+          }
+        }
+      }
+    }
+
     if (results.isEmpty) return null;
-    results.sort((a, b) =>
-        a.normalizedName.length.compareTo(b.normalizedName.length));
+
+    // Trier par score de pertinence (le plus pertinent en premier)
+    results.sort((a, b) {
+      final aScore = _matchScore(a.normalizedName, normalized);
+      final bScore = _matchScore(b.normalizedName, normalized);
+      return bScore.compareTo(aScore);
+    });
+
     return results.first;
+  }
+
+  /// Score de pertinence entre un nom de contact et le nom prononcé (0.0–1.0)
+  double _matchScore(String contactName, String spokenName) {
+    if (contactName == spokenName) return 1.0;
+    if (contactName.contains(spokenName)) return 0.9;
+    if (spokenName.contains(contactName)) return 0.85;
+
+    // Score par mots communs
+    final cWords = contactName.split(' ').where((w) => w.length > 1).toList();
+    final sWords = spokenName.split(' ').where((w) => w.length > 1).toList();
+    if (sWords.isEmpty) return 0.0;
+
+    int matches = 0;
+    for (final sw in sWords) {
+      for (final cw in cWords) {
+        if (cw == sw || cw.contains(sw) || sw.contains(cw)) {
+          matches++;
+          break;
+        }
+      }
+    }
+    return matches / sWords.length * 0.7;
   }
 
   /// Mettre à jour le cache complet des contacts
