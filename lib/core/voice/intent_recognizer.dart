@@ -140,7 +140,10 @@ class _Synonyms {
     'envoie un whatsapp', 'envoyer sur whatsapp',
     'message whatsapp', 'via whatsapp',
     'sur whatsapp', 'par whatsapp',
-    'wattsap', 'whats app',
+    'wattsap', 'whats app', 'whatsapp',
+    'watsap', 'whatsapp', 'envoie whatsapp',
+    'envoyer whatsapp', 'envoi whatsapp',
+    'un whatsapp', 'sur wa', 'wa message',
   ];
 
   static const frWhatsappCallVerbs = [
@@ -148,6 +151,9 @@ class _Synonyms {
     'appel vidéo', 'appel video', 'appel vocal whatsapp',
     'vidéo call', 'video call',
     'appelle via whatsapp', 'appelle par whatsapp',
+    'appelle sur wa', 'appel wa',
+    'appeller whatsapp', 'appel via wa',
+    'appelle whatsapp', 'appel whatsap',
   ];
 
   // ── Réveil / Alarme FR ────────────────────────────────────

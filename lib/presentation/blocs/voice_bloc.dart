@@ -12,9 +12,9 @@ import '../../core/services/car_mode_service.dart';
 import '../../domain/usecases/call_usecases.dart';
 import '../../data/repositories/contact_repository.dart';
 
-// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 // EVENTS
-// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 abstract class VoiceEvent extends Equatable {
   const VoiceEvent();
   @override
@@ -45,9 +45,9 @@ class VoiceHotwordToggled extends VoiceEvent {}
 class VoiceConfirmed extends VoiceEvent {}
 class VoiceDenied extends VoiceEvent {}
 
-// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 // STATE
-// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 enum AssistantStatus { initializing, ready, listening, processing, speaking, error }
 
 class VoiceState extends Equatable {
@@ -114,9 +114,9 @@ class VoiceState extends Equatable {
   ];
 }
 
-// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 // BLOC
-// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   final VoiceRecognizer _recognizer;
   final VoiceSynthesizer _synthesizer;
@@ -297,8 +297,8 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
             : 'send SMS to ${command.contactName ?? "?"}';
       case CommandAction.whatsappMessage:
         return lang == 'fr'
-            ? 'envoyer WhatsApp à ${command.contactName ?? "?"}'
-            : 'send WhatsApp to ${command.contactName ?? "?"}';
+            ? 'envoyer WhatsApp à ${command.contactName ?? "?"} : "${command.messageText ?? "?"}"'
+            : 'send WhatsApp to ${command.contactName ?? "?"}: "${command.messageText ?? "?"}"';
       case CommandAction.whatsappCall:
         return lang == 'fr'
             ? 'appel WhatsApp ${command.contactName ?? "?"}'
@@ -315,9 +315,11 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
         await _handleCall(command, emit);
       case CommandAction.answer:
         await _synthesizer.confirmAnswer(lang);
+        await _recognizer.stopListening();
         emit(state.copyWith(status: AssistantStatus.ready, displayText: 'Appel décroché'));
       case CommandAction.hangup:
         await _synthesizer.confirmHangup(lang);
+        await _recognizer.stopListening();
         emit(state.copyWith(status: AssistantStatus.ready, displayText: 'Appel terminé'));
       case CommandAction.whoCalling:
         await _synthesizer.speak(lang == 'fr' ? 'Consultation en cours' : 'Checking caller');
@@ -399,6 +401,8 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
         ? (command.language == 'fr' ? 'SMS envoyé à ${contact.displayName}' : 'SMS sent to ${contact.displayName}')
         : result.message;
     await _synthesizer.speak(msg);
+    // [FIX WA-04] Arrêter l'écoute après envoi SMS pour ne pas interférer
+    await _recognizer.stopListening();
     emit(state.copyWith(status: AssistantStatus.ready, displayText: msg));
   }
 
@@ -425,7 +429,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     final contact = await _contactRepo.findContact(command.contactName!);
     if (contact == null) {
       await _synthesizer.contactNotFound(command.contactName!, command.language);
-      emit(state.copyWith(status: AssistantStatus.ready, displayText: 'Contact introuvable'));
+      emit(state.copyWith(status: AssistantStatus.ready, displayText: 'Contact introuvable: ${command.contactName}'));
       return;
     }
     final result = await _whatsappService.sendMessage(
@@ -433,9 +437,22 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       contactName: contact.displayName,
       message: command.messageText!,
     );
-    final msg = result.success ? 'WhatsApp → ${contact.displayName}' : result.message;
-    await _synthesizer.speak(msg);
-    emit(state.copyWith(status: AssistantStatus.ready, displayText: msg));
+    if (result.success) {
+      // [FIX WA-05] Feedback vocal clair selon le résultat
+      await _synthesizer.speak(result.message);
+    } else {
+      // [FIX WA-06] Annoncer clairement l'erreur à l'utilisateur
+      final errorMsg = command.language == 'fr'
+          ? 'Erreur WhatsApp: ${result.message}'
+          : 'WhatsApp error: ${result.message}';
+      await _synthesizer.speak(errorMsg);
+    }
+    // [FIX WA-07] Arrêter l'écoute pour ne pas capter du bruit après l'action WhatsApp
+    await _recognizer.stopListening();
+    emit(state.copyWith(
+      status: AssistantStatus.ready,
+      displayText: result.success ? '✅ ${result.message}' : '❌ ${result.message}',
+    ));
   }
 
   Future<void> _handleWhatsappCall(VoiceCommand command, Emitter<VoiceState> emit) async {
@@ -451,18 +468,28 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     final contact = await _contactRepo.findContact(command.contactName!);
     if (contact == null) {
       await _synthesizer.contactNotFound(command.contactName!, command.language);
-      emit(state.copyWith(status: AssistantStatus.ready));
+      emit(state.copyWith(status: AssistantStatus.ready, displayText: 'Contact introuvable: ${command.contactName}'));
       return;
     }
-    await _whatsappService.makeCall(
+    final result = await _whatsappService.makeCall(
       phoneNumber: contact.phoneNumber,
       contactName: contact.displayName,
     );
-    final msg = command.language == 'fr'
-        ? 'Appel WhatsApp ${contact.displayName}'
-        : 'WhatsApp call ${contact.displayName}';
-    await _synthesizer.speak(msg);
-    emit(state.copyWith(status: AssistantStatus.ready, displayText: msg));
+    // [FIX WA-08] Vérifier le résultat au lieu de toujours dire "Appel lancé"
+    if (result.success) {
+      await _synthesizer.speak(result.message);
+    } else {
+      final errorMsg = command.language == 'fr'
+          ? 'Erreur appel WhatsApp: ${result.message}'
+          : 'WhatsApp call error: ${result.message}';
+      await _synthesizer.speak(errorMsg);
+    }
+    // [FIX WA-09] Arrêter l'écoute pour laisser WhatsApp prendre le focus
+    await _recognizer.stopListening();
+    emit(state.copyWith(
+      status: AssistantStatus.ready,
+      displayText: result.success ? '📞 ${result.message}' : '❌ ${result.message}',
+    ));
   }
 
   Future<void> _handleSetAlarm(VoiceCommand command, Emitter<VoiceState> emit) async {

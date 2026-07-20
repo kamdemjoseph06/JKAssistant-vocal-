@@ -79,6 +79,14 @@
     ══════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
 
+    <!-- ══════════════════════════════════════════════════════
+         WHATSAPP — ouvrir directement via intent (Android 11+)
+         QUERY_ALL_PACKAGES : vérifier si WhatsApp est installé
+         sans être restreint par les règles de visibilité
+    ══════════════════════════════════════════════════════ -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission"/>
+
     <!-- Android 11+ : déclarer les apps qu'on interroge via canLaunchUrl -->
     <queries>
         <package android:name="com.whatsapp"/>
@@ -89,6 +97,16 @@
         <intent>
             <action android:name="android.intent.action.SENDTO"/>
             <data android:scheme="sms"/>
+        </intent>
+        <!-- [FIX WA-10] Intent WhatsApp VIEW pour ouvrir WhatsApp directement -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="whatsapp"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+            <data android:host="wa.me"/>
         </intent>
     </queries>
 

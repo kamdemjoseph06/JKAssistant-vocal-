@@ -1,5 +1,10 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+/// Canal natif pour communiquer avec le code Kotlin (WhatsApp intents)
+const MethodChannel _whatsappChannel =
+    MethodChannel('com.jkassistant.vocal/whatsapp');
 
 class WhatsAppService {
 
@@ -13,11 +18,30 @@ class WhatsAppService {
     try {
       // [FIX E022] wa.me requiert le numéro SANS + mais en format international
       final cleanNumber = _toInternationalNoPlus(phoneNumber);
-
       final encodedMsg = Uri.encodeComponent(message);
-      final uri = Uri.parse(
-        'https://wa.me/$cleanNumber?text=$encodedMsg',
-      );
+
+      // ── Tentative 1 : Canal natif (ouvre WhatsApp directement avec le message) ──
+      bool sent = false;
+      try {
+        sent = await _whatsappChannel.invokeMethod<bool>(
+          'sendMessage',
+          {
+            'phoneNumber': cleanNumber,
+            'message': message,
+          },
+        ) ?? false;
+        if (sent) {
+          debugPrint('✅ WhatsAppService: message envoyé nativement → $contactName');
+          return WhatsAppResult.success('Message WhatsApp envoyé à $contactName');
+        }
+      } on PlatformException catch (e) {
+        debugPrint('⚠️ Canal natif WhatsApp sendMessage échoué (${e.code}): ${e.message}');
+      } catch (e) {
+        debugPrint('⚠️ Canal natif WhatsApp sendMessage erreur: $e');
+      }
+
+      // ── Fallback : wa.me via url_launcher ──
+      final uri = Uri.parse('https://wa.me/$cleanNumber?text=$encodedMsg');
 
       // [FIX E021] Toujours vérifier canLaunchUrl avant launchUrl
       if (!await canLaunchUrl(uri)) {
@@ -27,8 +51,8 @@ class WhatsAppService {
       }
 
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-      debugPrint('✅ WhatsApp ouvert pour $contactName');
-      return WhatsAppResult.success('WhatsApp ouvert pour $contactName');
+      debugPrint('✅ WhatsApp ouvert (fallback wa.me) pour $contactName');
+      return WhatsAppResult.success('WhatsApp ouvert pour $contactName — appuyez sur Envoyer');
     } catch (e) {
       debugPrint('❌ WhatsAppService.sendMessage error: $e');
       return WhatsAppResult.failure('Erreur WhatsApp: $e');
@@ -45,6 +69,24 @@ class WhatsAppService {
       // [FIX E022] wa.me requiert numéro sans +
       final cleanNumber = _toInternationalNoPlus(phoneNumber);
 
+      // ── Tentative 1 : Canal natif (ouvre WhatsApp directement vers le contact) ──
+      bool called = false;
+      try {
+        called = await _whatsappChannel.invokeMethod<bool>(
+          'makeCall',
+          {'phoneNumber': cleanNumber},
+        ) ?? false;
+        if (called) {
+          debugPrint('✅ WhatsAppService: appel lancé nativement → $contactName');
+          return WhatsAppResult.success('Appel WhatsApp lancé pour $contactName');
+        }
+      } on PlatformException catch (e) {
+        debugPrint('⚠️ Canal natif WhatsApp makeCall échoué (${e.code}): ${e.message}');
+      } catch (e) {
+        debugPrint('⚠️ Canal natif WhatsApp makeCall erreur: $e');
+      }
+
+      // ── Fallback : wa.me via url_launcher ──
       final uri = Uri.parse('https://wa.me/$cleanNumber');
 
       // [FIX E021] Toujours vérifier canLaunchUrl
@@ -53,8 +95,8 @@ class WhatsAppService {
       }
 
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-      debugPrint('✅ WhatsApp appel lancé pour $contactName');
-      return WhatsAppResult.success(contactName);
+      debugPrint('✅ WhatsApp ouvert (fallback wa.me) pour appel → $contactName');
+      return WhatsAppResult.success('WhatsApp ouvert pour $contactName — appuyez pour appeler');
     } catch (e) {
       debugPrint('❌ WhatsAppService.makeCall error: $e');
       return WhatsAppResult.failure('Erreur appel WhatsApp: $e');
