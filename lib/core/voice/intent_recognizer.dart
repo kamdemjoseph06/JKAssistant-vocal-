@@ -246,8 +246,13 @@ class _Synonyms {
 
   static const enWhatsappVerbs = [
     'whatsapp', 'whatsap', 'watsapp',
-    'send on whatsapp', 'via whatsapp', 'through whatsapp',
-    'whatsapp message',
+    'send on whatsapp', 'send via whatsapp', 'via whatsapp',
+    'through whatsapp', 'whatsapp message', 'message on whatsapp',
+  ];
+
+  static const enWhatsappCallVerbs = [
+    'whatsapp call', 'call on whatsapp', 'call via whatsapp',
+    'whatsapp voice call', 'whatsapp video call', 'video call on whatsapp',
   ];
 
   static const enAlarmVerbs = [
@@ -324,6 +329,19 @@ class IntentRecognizer {
 
   // ── Reconnaissance FR ─────────────────────────────────────
   Intent _recognizeFrench(String text, String raw) {
+    // WHATSAPP APPEL — priorité sur l'appel téléphonique.
+    final waCallMatch = _matchWithEntity(text, _Synonyms.frWhatsappCallVerbs);
+    if (waCallMatch != null) {
+      return Intent(type: IntentType.whatsappCall, confidence: waCallMatch.confidence, language: 'fr', contact: _extractContact(text, waCallMatch.matchedVerb));
+    }
+
+    // WHATSAPP MESSAGE — priorité sur SMS quand « whatsapp » est présent.
+    final waMatch = _matchWithEntity(text, _Synonyms.frWhatsappVerbs);
+    if (waMatch != null) {
+      final parts = _extractWhatsappContactAndMessage(text);
+      return Intent(type: IntentType.whatsappMessage, confidence: waMatch.confidence, language: 'fr', contact: parts.$1, message: parts.$2);
+    }
+
     // APPEL
     final callMatch = _matchWithEntity(text, _Synonyms.frCallVerbs);
     if (callMatch != null) {
@@ -375,29 +393,6 @@ class IntentRecognizer {
       );
     }
 
-    // WHATSAPP APPEL
-    if (_matchesAny(text, _Synonyms.frWhatsappCallVerbs) > 0.5) {
-      return Intent(
-        type: IntentType.whatsappCall,
-        confidence: _matchesAny(text, _Synonyms.frWhatsappCallVerbs),
-        language: 'fr',
-        contact: _extractAfterKeyword(text, ['whatsapp', 'appel']),
-      );
-    }
-
-    // WHATSAPP MESSAGE
-    final waMatch = _matchWithEntity(text, _Synonyms.frWhatsappVerbs);
-    if (waMatch != null) {
-      final parts = _extractContactAndMessage(text, waMatch.matchedVerb);
-      return Intent(
-        type: IntentType.whatsappMessage,
-        confidence: waMatch.confidence,
-        language: 'fr',
-        contact: parts.$1,
-        message: parts.$2,
-      );
-    }
-
     // RÉVEIL
     final alarmMatch = _matchWithEntity(text, _Synonyms.frAlarmVerbs);
     if (alarmMatch != null) {
@@ -442,6 +437,16 @@ class IntentRecognizer {
 
   // ── Reconnaissance EN ─────────────────────────────────────
   Intent _recognizeEnglish(String text, String raw) {
+    final waCallMatch = _matchWithEntity(text, _Synonyms.enWhatsappCallVerbs);
+    if (waCallMatch != null) {
+      return Intent(type: IntentType.whatsappCall, confidence: waCallMatch.confidence, language: 'en', contact: _extractContact(text, waCallMatch.matchedVerb));
+    }
+    final waMatch = _matchWithEntity(text, _Synonyms.enWhatsappVerbs);
+    if (waMatch != null) {
+      final parts = _extractWhatsappContactAndMessage(text);
+      return Intent(type: IntentType.whatsappMessage, confidence: waMatch.confidence, language: 'en', contact: parts.$1, message: parts.$2);
+    }
+
     final callMatch = _matchWithEntity(text, _Synonyms.enCallVerbs);
     if (callMatch != null) {
       return Intent(
@@ -473,18 +478,6 @@ class IntentRecognizer {
 
     if (_matchesAny(text, _Synonyms.enReadSmsVerbs) > 0.5) {
       return Intent(type: IntentType.readSms, confidence: 0.9, language: 'en');
-    }
-
-    final waMatch = _matchWithEntity(text, _Synonyms.enWhatsappVerbs);
-    if (waMatch != null) {
-      final parts = _extractContactAndMessage(text, waMatch.matchedVerb);
-      return Intent(
-        type: IntentType.whatsappMessage,
-        confidence: waMatch.confidence,
-        language: 'en',
-        contact: parts.$1,
-        message: parts.$2,
-      );
     }
 
     final alarmMatch = _matchWithEntity(text, _Synonyms.enAlarmVerbs);
