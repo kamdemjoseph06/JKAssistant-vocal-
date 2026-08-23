@@ -5,31 +5,23 @@ import '../database/app_database.dart';
 
 class ContactRepository {
   final AppDatabase _db;
-
   ContactRepository(this._db);
 
   Future<int> syncContacts() async {
     try {
-      final contacts = await FlutterContacts.getContacts(
-        withProperties: true,
-        withPhoto: false,
-      );
-
+      final permissionGranted = await FlutterContacts.requestPermission(readonly: true);
+      if (!permissionGranted) throw StateError('Permission de lecture des contacts refusée');
+      final contacts = await FlutterContacts.getContacts(withProperties: true, withPhoto: false);
       final rows = <ContactsCacheTableCompanion>[];
-
       for (final contact in contacts) {
+        final displayName = contact.displayName.trim();
+        if (displayName.isEmpty) continue;
         for (final phone in contact.phones) {
-          rows.add(ContactsCacheTableCompanion.insert(
-            contactId: contact.id,
-            displayName: contact.displayName,
-            normalizedName: _normalize(contact.displayName),
-            phoneNumber: _cleanPhone(phone.number),
-            phoneLabel: Value(phone.label.name),
-            cachedAt: DateTime.now(),
-          ));
+          final phoneNumber = _cleanPhone(phone.number);
+          if (phoneNumber.isEmpty) continue;
+          rows.add(ContactsCacheTableCompanion.insert(contactId: contact.id, displayName: displayName, normalizedName: _normalize(displayName), phoneNumber: phoneNumber, phoneLabel: Value(phone.label.name), cachedAt: DateTime.now()));
         }
       }
-
       await _db.contactsDao.refreshCache(rows);
       debugPrint('✅ ContactRepository: ${rows.length} numéros synchronisés');
       return rows.length;
@@ -50,20 +42,6 @@ class ContactRepository {
   }
 
   Future<int> getCachedCount() => _db.contactsDao.count();
-
-  String _cleanPhone(String raw) {
-    return raw.replaceAll(RegExp(r'[\s\-\.\(\)]'), '');
-  }
-
-  String _normalize(String input) {
-    return input
-        .toLowerCase()
-        .replaceAll(RegExp(r'[àáâãäå]'), 'a')
-        .replaceAll(RegExp(r'[èéêë]'), 'e')
-        .replaceAll(RegExp(r'[ìíîï]'), 'i')
-        .replaceAll(RegExp(r'[òóôõö]'), 'o')
-        .replaceAll(RegExp(r'[ùúûü]'), 'u')
-        .replaceAll(RegExp(r'[ç]'), 'c')
-        .trim();
-  }
+  String _cleanPhone(String raw) => raw.trim().replaceAll(RegExp(r'[\s\-\.\(\)]'), '');
+  String _normalize(String input) => input.toLowerCase().replaceAll(RegExp(r'[àáâãäå]'), 'a').replaceAll(RegExp(r'[èéêë]'), 'e').replaceAll(RegExp(r'[ìíîï]'), 'i').replaceAll(RegExp(r'[òóôõö]'), 'o').replaceAll(RegExp(r'[ùúûü]'), 'u').replaceAll(RegExp(r'[ç]'), 'c').trim();
 }
