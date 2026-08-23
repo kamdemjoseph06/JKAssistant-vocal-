@@ -32,7 +32,7 @@ class WhatsAppService {
         ) ?? false;
         if (sent) {
           debugPrint('✅ WhatsAppService: message envoyé nativement → $contactName');
-          return WhatsAppResult.success('Message WhatsApp envoyé à $contactName');
+          return WhatsAppResult.success('WhatsApp ouvert pour $contactName — appuyez sur Envoyer');
         }
       } on PlatformException catch (e) {
         debugPrint('⚠️ Canal natif WhatsApp sendMessage échoué (${e.code}): ${e.message}');
@@ -78,7 +78,7 @@ class WhatsAppService {
         ) ?? false;
         if (called) {
           debugPrint('✅ WhatsAppService: appel lancé nativement → $contactName');
-          return WhatsAppResult.success('Appel WhatsApp lancé pour $contactName');
+          return WhatsAppResult.success('WhatsApp ouvert pour $contactName — appuyez sur Appeler');
         }
       } on PlatformException catch (e) {
         debugPrint('⚠️ Canal natif WhatsApp makeCall échoué (${e.code}): ${e.message}');
@@ -96,7 +96,7 @@ class WhatsAppService {
 
       await launchUrl(uri, mode: LaunchMode.externalApplication);
       debugPrint('✅ WhatsApp ouvert (fallback wa.me) pour appel → $contactName');
-      return WhatsAppResult.success('WhatsApp ouvert pour $contactName — appuyez pour appeler');
+      return WhatsAppResult.success('WhatsApp ouvert pour $contactName — appuyez sur Appeler');
     } catch (e) {
       debugPrint('❌ WhatsAppService.makeCall error: $e');
       return WhatsAppResult.failure('Erreur appel WhatsApp: $e');
