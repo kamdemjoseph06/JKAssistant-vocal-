@@ -23,7 +23,7 @@ import 'package:flutter/foundation.dart';
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri);
           debugPrint('SMS ouvert pour $contactName ($cleanNumber)');
-          return SmsResult.success('Application SMS ouverte pour $contactName');
+          return SmsResult.success('Application SMS ouverte pour $contactName avec le message prêt. Appuyez sur Envoyer.');
         } else {
           return SmsResult.failure("Impossible d'ouvrir l'application SMS");
         }
