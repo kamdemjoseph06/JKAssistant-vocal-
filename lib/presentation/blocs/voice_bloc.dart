@@ -186,10 +186,16 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       emit(state.copyWith(
         status: AssistantStatus.ready,
         displayText: 'Prêt. Dites "Appelle [nom]"',
-        contactsSynced: true,
+        contactsSynced: syncResult.success,
         contactsCount: count,
       ));
-      await _synthesizer.speak(count > 0 ? 'Assistant prêt. $count contacts chargés.' : 'Assistant prêt.');
+      await _synthesizer.speak(
+        syncResult.success
+            ? (count > 0
+                ? 'Assistant prêt. $count contacts chargés.'
+                : 'Assistant prêt. Aucun contact avec numéro trouvé.')
+            : 'Assistant prêt, mais je ne peux pas lire vos contacts. Vérifiez l’autorisation Contacts.',
+      );
     } catch (e) {
       emit(state.copyWith(status: AssistantStatus.error, errorMessage: 'Erreur: $e'));
     }
