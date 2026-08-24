@@ -31,13 +31,15 @@ jobs:
 
       - name: Télécharger modèle Vosk FR
         run: |
-          wget -q https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip -O /tmp/vosk-fr.zip
-          unzip -q /tmp/vosk-fr.zip -d assets/models/ && rm /tmp/vosk-fr.zip
+          wget -q https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip \
+            -O assets/models/vosk-model-small-fr-0.22.zip
+
 
       - name: Télécharger modèle Vosk EN
         run: |
-          wget -q https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip -O /tmp/vosk-en.zip
-          unzip -q /tmp/vosk-en.zip -d assets/models/ && rm /tmp/vosk-en.zip
+          wget -q https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip \
+            -O assets/models/vosk-model-small-en-us-0.15.zip
+
 
       - run: flutter pub get
 
