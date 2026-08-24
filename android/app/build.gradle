@@ -51,7 +51,8 @@ android {
 
     defaultConfig {
         applicationId "com.jkassistant.vocal"
-        minSdk 23
+        // Flutter 3.27 supporte Android 5.0+ ; conserver une base large.
+        minSdk 21
         targetSdk 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
