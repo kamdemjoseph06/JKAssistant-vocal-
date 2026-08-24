@@ -634,6 +634,27 @@ class IntentRecognizer {
     return null;
   }
 
+  /// Extraire le contact et le message d’une commande WhatsApp.
+  /// Le marqueur WhatsApp peut apparaître avant ou après le verbe.
+  (String?, String?) _extractWhatsappContactAndMessage(String text) {
+    final markerMatch = RegExp(
+      r'\b(?:whatsapp|whatssap|watsap|watzap|wattsap|whats app|wa)\b',
+    ).firstMatch(text);
+
+    var remaining = markerMatch == null
+        ? text.trim()
+        : text.substring(markerMatch.end).trim();
+
+    final prefix = RegExp(
+      r'^(?:a|au|aux|le|la|un|une|mon|ma|sur|par|via|message|envoyer|envoie|envoi)\s+',
+    );
+    while (prefix.hasMatch(remaining)) {
+      remaining = remaining.replaceFirst(prefix, '').trim();
+    }
+
+    return _extractContactAndMessage(remaining, '');
+  }
+
   /// Extraire contact ET message pour SMS/WhatsApp
   (String?, String?) _extractContactAndMessage(String text, String matchedVerb) {
     String remaining = text.replaceFirst(matchedVerb, '').trim();
