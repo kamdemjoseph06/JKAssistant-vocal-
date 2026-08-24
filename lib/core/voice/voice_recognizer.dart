@@ -8,11 +8,12 @@ enum RecognizerStatus { idle, loading, ready, listening, error }
 
 class VoiceRecognizer {
   static const _modelPaths = {
-    VoiceLanguage.french: 'assets/models/vosk-model-small-fr-0.22',
-    VoiceLanguage.english: 'assets/models/vosk-model-small-en-us-0.15',
+    VoiceLanguage.french: 'assets/models/vosk-model-small-fr-0.22.zip',
+    VoiceLanguage.english: 'assets/models/vosk-model-small-en-us-0.15.zip',
   };
 
   final VoskFlutterPlugin _vosk = VoskFlutterPlugin.instance();
+  final ModelLoader _modelLoader = ModelLoader();
   Model? _frModel;
   Model? _enModel;
   Recognizer? _currentRecognizer;
@@ -41,10 +42,16 @@ class VoiceRecognizer {
   Future<void> initialize() async {
     _status = RecognizerStatus.loading;
     try {
-      _frModel = await _vosk.createModel(
-          _modelPaths[VoiceLanguage.french]!);
-      _enModel = await _vosk.createModel(
-          _modelPaths[VoiceLanguage.english]!);
+      // createModel attend un dossier extrait, pas un chemin d’asset.
+      // ModelLoader décompresse les archives dans le stockage de l’application.
+      final frPath = await _modelLoader.loadFromAssets(
+        _modelPaths[VoiceLanguage.french]!,
+      );
+      final enPath = await _modelLoader.loadFromAssets(
+        _modelPaths[VoiceLanguage.english]!,
+      );
+      _frModel = await _vosk.createModel(frPath);
+      _enModel = await _vosk.createModel(enPath);
       _status = RecognizerStatus.ready;
       debugPrint('✅ VoiceRecognizer: Modèles FR + EN chargés');
     } catch (e) {
@@ -101,7 +108,15 @@ class VoiceRecognizer {
         }
       });
 
-      await _speechService!.start();
+      final started = await _speechService!.start(
+        onRecognitionError: (Object error) {
+          _status = RecognizerStatus.error;
+          debugPrint('❌ Erreur du flux microphone/Vosk: $error');
+        },
+      );
+      if (started == false) {
+        throw StateError('Le service de reconnaissance Vosk n’a pas démarré');
+      }
       _status = RecognizerStatus.listening;
       debugPrint('🎙️ Écoute démarrée (${_currentLanguage.name})');
     } catch (e) {
