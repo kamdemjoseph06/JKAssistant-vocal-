@@ -11,7 +11,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -34,29 +33,29 @@ jobs:
           wget -q https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip \
             -O assets/models/vosk-model-small-fr-0.22.zip
 
-
       - name: Télécharger modèle Vosk EN
         run: |
           wget -q https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip \
             -O assets/models/vosk-model-small-en-us-0.15.zip
 
-
       - run: flutter pub get
-
       - run: flutter pub run build_runner build --delete-conflicting-outputs
 
-      - name: Compiler APK Release
-        run: flutter build apk --release --no-tree-shake-icons
+      - name: Compiler les APK par architecture
+        run: flutter build apk --release --split-per-abi --no-tree-shake-icons --build-number "${{ github.run_number }}" --build-name "2.0.${{ github.run_number }}"
 
-      - name: Nommer l'APK
+      - name: Nommer les APK
         id: apk_info
         run: |
           DATE=$(date +%Y%m%d-%H%M)
           SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          NAME="JKAssistant-v${DATE}-${SHA}.apk"
-          cp build/app/outputs/flutter-apk/app-release.apk "$NAME"
-          echo "apk_name=$NAME" >> $GITHUB_OUTPUT
-          echo "tag=v${DATE}" >> $GITHUB_OUTPUT
+          mkdir -p release-assets
+          for ABI in arm64-v8a armeabi-v7a x86_64; do
+            SRC="build/app/outputs/flutter-apk/app-${ABI}-release.apk"
+            DEST="release-assets/JKAssistant-vocal-${DATE}-${SHA}-${ABI}.apk"
+            cp "${SRC}" "${DEST}"
+          done
+          echo "tag=v${DATE}-${SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Créer GitHub Release
         uses: softprops/action-gh-release@v2
@@ -64,18 +63,16 @@ jobs:
           tag_name: ${{ steps.apk_info.outputs.tag }}
           name: "JKAssistant Vocal — ${{ steps.apk_info.outputs.tag }}"
           body: |
-            ## 📱 Installation
-            1. Téléchargez le fichier **.apk** ci-dessous
-            2. Android : **Paramètres → Sécurité → Sources inconnues** → Activer
-            3. Ouvrez le fichier et installez
+            ## Installation Android
 
-            ## 🎙️ Utilisation sans toucher l'écran
-            - Dites **"Hey Vocal"** pour réveiller l'assistant
-            - **"Appelle Maurice"** → appel direct automatique
-            - **"Envoie un WhatsApp à Jean je suis en route"**
-            - **"SMS à Marie j'arrive dans 10 minutes"**
-            - **"Oui"** ou **"Non"** pour confirmer à voix haute
+            Téléchargez la variante correspondant à votre appareil :
 
-            Commit : `${{ github.sha }}`
-          files: ${{ steps.apk_info.outputs.apk_name }}
+            - **arm64-v8a** : recommandé pour la plupart des téléphones Android récents.
+            - **armeabi-v7a** : téléphones Android plus anciens en 32 bits.
+            - **x86_64** : émulateurs et appareils Android Intel compatibles.
+
+            Autorisez l’installation depuis GitHub ou votre gestionnaire de fichiers, puis accordez les permissions Microphone, Contacts et Téléphone.
+
+            Cette release embarque les modèles Vosk sous le format attendu par l’application.
+          files: release-assets/*.apk
           make_latest: true
